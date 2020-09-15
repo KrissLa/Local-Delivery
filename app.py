@@ -1,15 +1,42 @@
+from aiogram import executor
+
+from data.config import admins
+from handlers import dp
+from loader import db
+from utils.notify_admins import on_startup_notify
+
+
 async def on_startup(dp):
     import filters
     import middlewares
     filters.setup(dp)
     middlewares.setup(dp)
 
-    from utils.notify_admins import on_startup_notify
+    await db.set_timezone()
+    await db.create_table_metro()
+    await db.create_table_locations()
+    await db.create_table_local_objects()
+    await db.create_table_categories()
+    await db.create_table_products()
+    await db.create_table_product_sizes()
+    await db.create_table_locations_categories()
+    await db.create_table_locations_products()
+    await db.create_table_locations_product_sizes()
+    await db.create_table_admins()
+    await db.create_table_admin_sellers()
+    await db.create_table_sellers()
+    await db.create_table_couriers()
+    await db.create_table_users()
+    await db.create_table_orders()
+    await db.create_table_temp_orders()
+    print("Готово")
+    print("Пытаюсь добавить админов")
+
+
+    print("Готово")
+
     await on_startup_notify(dp)
 
 
 if __name__ == '__main__':
-    from aiogram import executor
-    from handlers import dp
-
     executor.start_polling(dp, on_startup=on_startup)

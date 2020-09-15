@@ -11,6 +11,10 @@ admins = [
 ]
 
 ip = os.getenv("ip")
+PORT = int(os.getenv("PORT"))
+PGDATABASE = str(os.getenv("PGDATABASE"))
+PGUSER = str(os.getenv("PGUSER"))
+PGPASSWORD = str(os.getenv("PGPASSWORD"))
 
 aiogram_redis = {
     'host': ip,
@@ -20,3 +24,5 @@ redis = {
     'address': (ip, 6379),
     'encoding': 'utf8'
 }
+
+
