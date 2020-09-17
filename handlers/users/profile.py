@@ -3,44 +3,51 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from keyboards.inline.callback_datas import metro_data, local_object_data
-from keyboards.inline.inline_keyboards import generate_keyboard_with_metro_profile, get_available_local_objects_profile
+from keyboards.inline.inline_keyboards import generate_keyboard_with_metro_profile, get_available_local_objects_profile, \
+    generate_keyboard_with_metro
 from loader import dp, db
+from states.menu_states import SignUpUser
 from states.profile_states import ProfileState
 
 
 @dp.message_handler(text="Профиль")
 async def send_categories_menu(message: types.Message):
     """Отправляем информацию профиля"""
-    user_info = await db.get_user_profile_info(message.from_user.id)
-    print(user_info)
-    if user_info['user_address']:
-        await message.answer(f"Ваш профиль\n"
-                             f"\n"
-                             f"User ID: {user_info['user_telegram_id']}\n"
-                             f"Адрес доставки: {user_info['local_object_name']}\n"
-                             f"Параметры доставки: {user_info['user_address']}",
-                             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                 [
-                                     InlineKeyboardButton(
-                                         text='Изменить',
-                                         callback_data='change_profile'
-                                     )
-                                 ]
-                             ]))
-    else:
-        await message.answer(text=f"Ваш профиль\n"
-                                  f"\n"
-                                  f"User ID: {user_info['user_telegram_id']}\n"
-                                  f"Адрес доставки: {user_info['local_object_name']}\n"
-                                  f"Параметры доставки: Не указаны",
-                             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                 [
-                                     InlineKeyboardButton(
-                                         text='Изменить',
-                                         callback_data='change_profile'
-                                     )
-                                 ]
-                             ]))
+    try:
+        user_info = await db.get_user_profile_info(message.from_user.id)
+        print(user_info)
+        if user_info['user_address']:
+            await message.answer(f"Ваш профиль\n"
+                                 f"\n"
+                                 f"User ID: {user_info['user_telegram_id']}\n"
+                                 f"Адрес доставки: {user_info['local_object_name']}\n"
+                                 f"Параметры доставки: {user_info['user_address']}",
+                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                     [
+                                         InlineKeyboardButton(
+                                             text='Изменить',
+                                             callback_data='change_profile'
+                                         )
+                                     ]
+                                 ]))
+        else:
+            await message.answer(text=f"Ваш профиль\n"
+                                      f"\n"
+                                      f"User ID: {user_info['user_telegram_id']}\n"
+                                      f"Адрес доставки: {user_info['local_object_name']}\n"
+                                      f"Параметры доставки: Не указаны",
+                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                     [
+                                         InlineKeyboardButton(
+                                             text='Изменить',
+                                             callback_data='change_profile'
+                                         )
+                                     ]
+                                 ]))
+    except:
+        await message.answer(f"Сначала нужно выбрать ближайшую станцию метро и точку продаж",
+                             reply_markup=await generate_keyboard_with_metro())
+        await SignUpUser.Metro.set()
 
 
 @dp.callback_query_handler(text='cancel', state=[ProfileState.WaitMetro,

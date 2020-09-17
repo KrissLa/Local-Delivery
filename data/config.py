@@ -6,9 +6,7 @@ load_dotenv()
 
 BOT_TOKEN = str(os.getenv("BOT_TOKEN"))
 
-admins = [
-    os.getenv("ADMIN_ID"),
-]
+admins = int(os.getenv("ADMIN_ID"))
 
 ip = os.getenv("ip")
 PORT = int(os.getenv("PORT"))

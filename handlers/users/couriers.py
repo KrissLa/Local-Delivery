@@ -2,8 +2,9 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
+from filters.users_filters import IsCourierCallback
 from keyboards.inline.callback_datas import order_is_delivered
-from loader import dp, db
+from loader import dp, db, bot
 
 
 @dp.message_handler(commands=['all_ready_orders'], state=["*"])
@@ -38,7 +39,7 @@ async def get_my_orders(message: types.Message, state: FSMContext):
     await state.finish()
     couriers_orders = await db.get_all_waiting_orders_for_courier(message.from_user.id)
     if couriers_orders:
-        await message.answer('Вам назначены слудующие заказы:')
+        await message.answer('Вам назначены следующие заказы:')
         for order in couriers_orders:
             await message.answer(f'Заказ № {order["order_id"]}.\n'
                                  f'{order["order_info"]}'
@@ -51,12 +52,15 @@ async def get_my_orders(message: types.Message, state: FSMContext):
         await message.answer('Пока Вам не назначили заказов.')
 
 
-@dp.callback_query_handler(order_is_delivered.filter())
+@dp.callback_query_handler(IsCourierCallback(), order_is_delivered.filter())
 async def confirm_delivery_courier(call: CallbackQuery, callback_data: dict):
     """Курьер подтверждает доставку"""
     order_id = int(callback_data.get('order_id'))
     user_id = int(callback_data.get('user_id'))
     if await db.order_is_delivered(order_id, user_id):
         await call.message.answer(f'Заказ № {order_id} доставлен!')
+        await bot.send_message(user_id,
+                               f'Ваш заказ № {order_id} доставлен.\n'
+                               f'Приятного аппетита!')
     else:
         await call.message.answer('Заказ уже отмечен как доставлен.')

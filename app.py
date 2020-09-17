@@ -29,8 +29,10 @@ async def on_startup(dp):
     await db.create_table_users()
     await db.create_table_orders()
     await db.create_table_temp_orders()
+    await db.create_table_bonus_orders()
     print("Готово")
     print("Пытаюсь добавить админов")
+    await db.add_admin(admins, 'Главный админ')
 
 
     print("Готово")

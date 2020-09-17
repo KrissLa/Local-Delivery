@@ -11,9 +11,6 @@ from loader import dp, db
 from states.menu_states import SignUpUser
 
 
-
-
-
 @dp.message_handler(CommandStart(deep_link=compile(r'\d\w*')), state=['*'])
 async def bot_start_referal(message: types.Message, state: FSMContext):
     """Отлавливаем реферальные ссылки"""
@@ -69,6 +66,14 @@ async def get_user_location(call: CallbackQuery, callback_data: dict):
                               f"Выберите объект локальной доставки",
                               reply_markup=await get_available_local_objects(metro_id))
     await SignUpUser.Location.set()
+
+
+@dp.callback_query_handler(text='back', state=SignUpUser.Location)
+async def none_location_list(call: CallbackQuery):
+    await call.message.edit_reply_markup()
+    await call.message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшее метро.",
+                              reply_markup=await generate_keyboard_with_metro())
+    await SignUpUser.Metro.set()
 
 
 @dp.callback_query_handler(local_object_data.filter(), state=SignUpUser.Location)

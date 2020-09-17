@@ -6,7 +6,8 @@ from keyboards.inline.callback_datas import back_to_product_list_data, back_to_p
 from keyboards.inline.inline_keyboards import generate_keyboard_with_categories, generate_keyboard_with_products, \
     generate_keyboard_with_sizes, generate_keyboard_with_count_and_prices, \
     generate_keyboard_with_count_and_prices_for_size, one_more_product_markup, delivery_options_markup, \
-    need_pass_markup, build_keyboard_with_time
+    need_pass_markup, build_keyboard_with_time, generate_keyboard_with_none_categories, \
+    generate_keyboard_with_none_products
 from loader import dp, db, bot
 from states.menu_states import Menu
 from utils.temp_orders_list import get_temp_orders_list_message, get_final_price, get_couriers_list
@@ -25,37 +26,52 @@ async def back_to_category(call: CallbackQuery):
     """Назад к выбору категории"""
     await call.message.edit_reply_markup()
     await call.answer("Вы нажали назад")
-    await call.message.answer('Выберите категорию меню',
-                              reply_markup=await generate_keyboard_with_categories(call.from_user.id))
+    categories = await db.get_categories_for_user_location_id(call.from_user.id)
+    if categories:
+        await call.message.answer('Выберите категорию меню',
+                                  reply_markup=await generate_keyboard_with_categories(categories))
+    else:
+        await call.message.answer('Нет доступных категорий.',
+                                  reply_markup=await generate_keyboard_with_none_categories())
     await Menu.WaitCategory.set()
 
 
 @dp.callback_query_handler(back_to_product_list_data.filter(), state=[Menu.WaitQuantity, Menu.WaitQuantityBack])
 async def back_to_product(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Назад к выбору товара без размеров"""
+    await call.message.edit_reply_markup()
     await call.answer(cache_time=10)
     if await state.get_state() == 'Menu:WaitQuantityBack':
         await db.delete_from_cart(call.from_user.id)
     category_id = int(callback_data.get('category_id'))
-    await call.message.edit_reply_markup()
-    await call.message.answer('Выберите товар',
-                              reply_markup=await generate_keyboard_with_products(call.from_user.id, category_id))
+    products = await db.get_product_for_user_location_id(call.from_user.id, category_id)
+    if products:
+        await call.message.answer('Выберите товар',
+                                  reply_markup=await generate_keyboard_with_products(products))
+    else:
+        await call.message.answer('Нет доступных товаров.',
+                                  reply_markup=await generate_keyboard_with_none_products())
 
     await Menu.WaitProduct.set()
 
 
-@dp.callback_query_handler(back_to_product_from_sizes_list_data.filter(), state=[Menu.WaitProductSize,
+@dp.callback_query_handler(back_to_product_list_data.filter(), state=[Menu.WaitProductSize,
                                                                                  Menu.WaitProductSizeBack])
 async def back_to_product_from_sizes_list(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Назад к выбору товара из меню выбора размера"""
+    print('Поймал')
     if await state.get_state() == 'Menu:WaitProductSizeBack':
         await db.delete_from_cart(call.from_user.id)
     await call.answer(cache_time=10)
     category_id = int(callback_data.get('category_id'))
-    print(category_id)
+    products = await db.get_product_for_user_location_id(call.from_user.id, category_id)
     await call.message.edit_reply_markup()
-    await call.message.answer('Выберите товар',
-                              reply_markup=await generate_keyboard_with_products(call.from_user.id, category_id))
+    if products:
+        await call.message.answer('Выберите товар',
+                                  reply_markup=await generate_keyboard_with_products(products))
+    else:
+        await call.message.answer('Нет доступных товаров.',
+                                  reply_markup=await generate_keyboard_with_none_products())
 
     await Menu.WaitProduct.set()
 

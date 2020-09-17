@@ -1,7 +1,30 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from keyboards.inline.callback_datas import confirm_order_seller_data
+from keyboards.inline.callback_datas import confirm_order_seller_data, confirm_bonus_order
 from loader import bot
+
+
+async def send_message_to_sellers_bonus(sellers_list, order_info):
+    """Отправляем сообщение продавцам"""
+    message = f"""Новый бонусный заказ № {order_info['bonus_order_id']}!
+Количество бонусных роллов: {order_info['bonus_quantity']}
+Пожалуйста, подойдите к кассе и, после выбора роллов клиентом, подтвердите заказ"""
+    for seller in sellers_list:
+        await bot.send_message(seller['seller_telegram_id'],
+                               message,
+                               reply_markup=InlineKeyboardMarkup(
+                                   inline_keyboard=[
+                                       [
+                                           InlineKeyboardButton(
+                                               text=f'Подтвердить бонусный заказ № {order_info["bonus_order_id"]}',
+                                               callback_data=confirm_bonus_order.new(
+                                                   b_order_id=order_info["bonus_order_id"])
+                                           )
+                                       ]
+
+                                   ]
+                               )
+                               )
 
 
 async def send_message_to_sellers(sellers_list, order_detail):

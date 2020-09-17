@@ -77,7 +77,7 @@ class Database:
         sql = """
         CREATE TABLE IF NOT EXISTS products (
         product_id SERIAL PRIMARY KEY,
-        product_category_id INT NOT NULL,
+        product_category_id INT,
         product_name VARCHAR(500) NOT NULL,
         product_description TEXT,
         product_photo_id TEXT,
@@ -88,7 +88,7 @@ class Database:
         price_5 INT,
         price_6 INT,
         is_product_available BOOLEAN NOT NULL DEFAULT true,
-        FOREIGN KEY (product_category_id) REFERENCES categories (category_id) ON UPDATE CASCADE);
+        FOREIGN KEY (product_category_id) REFERENCES categories (category_id) ON UPDATE CASCADE ON DELETE CASCADE);
         """
         await self.pool.execute(sql)
 
@@ -115,7 +115,7 @@ class Database:
         sql = """
                 CREATE TABLE IF NOT EXISTS locations_categories (
                 lc_location_id INT REFERENCES locations (location_id) ON UPDATE CASCADE ON DELETE CASCADE,
-                lc_category_id INT REFERENCES categories (category_id) ON UPDATE CASCADE,
+                lc_category_id INT REFERENCES categories (category_id) ON UPDATE CASCADE ON DELETE CASCADE,
                 is_category_in_location_available BOOLEAN NOT NULL DEFAULT true,
                 CONSTRAINT locations_categories_pkey PRIMARY KEY (lc_location_id, lc_category_id));
                 """
@@ -148,7 +148,8 @@ class Database:
         sql = """
                 CREATE TABLE IF NOT EXISTS admins (
                 admin_id SERIAL PRIMARY KEY,
-                admin_telegram_id INT NOT NULL UNIQUE
+                admin_telegram_id INT NOT NULL UNIQUE,
+                admin_name VARCHAR(255)
                 );
                 """
         await self.pool.execute(sql)
@@ -217,7 +218,8 @@ class Database:
            number_of_referral_orders INT NOT NULL DEFAULT 0,
            bonus INT NOT NULL DEFAULT 0,
            FOREIGN KEY (user_metro_id) REFERENCES metro (metro_id) ON DELETE SET NULL,
-           FOREIGN KEY (user_location_id) REFERENCES locations (location_id) ON DELETE SET NULL
+           FOREIGN KEY (user_location_id) REFERENCES locations (location_id) ON DELETE SET NULL,
+           FOREIGN KEY (user_local_object_id) REFERENCES local_objects (local_object_id) ON DELETE SET NULL
            );
            """
         await self.pool.execute(sql)
@@ -273,10 +275,23 @@ class Database:
            """
         await self.pool.execute(sql)
 
+    async def create_table_bonus_orders(self):
+        """Создаем таблицу бонусных заказов"""
+        sql = """
+                   CREATE TABLE IF NOT EXISTS bonus_orders (
+                   bonus_order_id SERIAL PRIMARY KEY,
+                   bonus_order_user_telegram_id INT NOT NULL,
+                   bonus_location_id INT NOT NULL,
+                   bonus_quantity INT NOT NULL,
+                   bonus_order_status VARCHAR(255)
+                   );
+                   """
+        await self.pool.execute(sql)
+
     async def get_available_metro(self):
         """Получаем список доступных станций метро"""
         return await self.pool.fetch(
-            "SELECT metro_id, metro_name  FROM metro where is_metro_available = TRUE")
+            "SELECT metro_id, metro_name  FROM metro where is_metro_available = TRUE ORDER BY metro_id")
 
     async def get_metro_name_by_metro_id(self, metro_id):
         """Получаем название станции метро по его id"""
@@ -286,6 +301,11 @@ class Database:
         """Получаем список доступных локаций около заданной станции метро"""
         return await self.pool.fetch(
             f"SELECT location_id, location_name  FROM locations where location_metro_id = {metro_id} AND is_location_available = TRUE")
+
+    async def get_locations_by_metro_id(self, metro_id):
+        """Получаем список доступных локаций около заданной станции метро"""
+        return await self.pool.fetch(
+            f"SELECT location_id, location_name  FROM locations where location_metro_id = {metro_id}")
 
     async def get_available_local_objects(self, metro_id):
         """Получаем список доступных объектов доставки около заданной станции метро"""
@@ -326,13 +346,21 @@ class Database:
                 f"SELECT NOT EXISTS(SELECT user_telegram_id FROM users WHERE user_telegram_id = {user_telegram_id})"):
             sql = "INSERT INTO users (user_telegram_id, user_metro_id, user_location_id, user_local_object_id) VALUES ($1, $2, $3, $4)"
             done = False
+            count = 0
             while not done:
+                if count == 15:
+                    break
                 try:
                     await self.pool.execute(sql, user_telegram_id, user_metro_id, user_location_id,
                                             user_local_object_id)
                     done = True
                 except asyncpg.exceptions.UniqueViolationError:
-                    pass
+                    count += 1
+        else:
+            await self.pool.execute(
+                f"UPDATE users SET user_metro_id = {user_metro_id}, user_location_id = {user_location_id},"
+                f"user_local_object_id = {user_local_object_id}"
+            )
 
         return
 
@@ -347,13 +375,16 @@ class Database:
                 f"SELECT NOT EXISTS(SELECT user_telegram_id FROM users WHERE user_telegram_id = {user_telegram_id})"):
             sql = "INSERT INTO users (user_telegram_id, user_metro_id, user_location_id, user_local_object_id, inviter_id) VALUES ($1, $2, $3, $4, $5)"
             done = False
+            count = 0
             while not done:
+                if count == 15:
+                    break
                 try:
                     await self.pool.execute(sql, user_telegram_id, user_metro_id, user_location_id,
                                             user_local_object_id, inviter_id)
                     done = True
                 except asyncpg.exceptions.UniqueViolationError:
-                    pass
+                    count += 1
 
         return
 
@@ -367,7 +398,7 @@ class Database:
             f'UPDATE users SET number_of_referrals = {ref_count} WHERE user_telegram_id = {inviter_id}'
         )
 
-    async def get_categories_for_user_location_id(self, user_id, ):
+    async def get_categories_for_user_location_id(self, user_id):
         """Получаем список доступных категорий в локации пользователя"""
         sql = f"""
         SELECT categories.category_name, categories.category_id
@@ -434,14 +465,17 @@ class Database:
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
               """
         done = False
+        count = 0
         while not done:
+            if count == 15:
+                break
             try:
                 await self.pool.execute(sql, user_id, order_detail['product_id'], order_detail['size_id'],
                                         order_detail['product_name'], order_detail['product_price'],
                                         order_detail['quantity'], order_detail['order_price'])
                 done = True
             except asyncpg.exceptions.UniqueViolationError:
-                pass
+                count += 1
 
     async def get_temp_orders(self, user_id):
         """Получаем товары из 'Корзины' """
@@ -496,14 +530,17 @@ class Database:
          order_local_object_name, delivery_method, order_info, order_price, order_status) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"""
         done = False
+        count = 0
         while not done:
+            if count == 15:
+                break
             try:
                 await self.pool.execute(sql, order_user_telegram_id, order_metro_id, order_location_id,
                                         order_local_object_id,
                                         order_local_object_name, delivery_method, order_info, order_price, order_status)
                 done = True
             except asyncpg.exceptions.UniqueViolationError:
-                pass
+                count += 1
 
     async def add_order_pickup(self,
                                order_user_telegram_id,
@@ -522,14 +559,17 @@ class Database:
          order_local_object_name, delivery_method, delivery_address, order_info, order_price, order_status) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"""
         done = False
+        count = 0
         while not done:
+            if count == 15:
+                break
             try:
                 await self.pool.execute(sql, order_user_telegram_id, order_metro_id, order_location_id,
                                         order_local_object_id, order_local_object_name, delivery_method,
                                         delivery_address, order_info, order_price, order_status)
                 done = True
             except asyncpg.exceptions.UniqueViolationError:
-                pass
+                count += 1
 
     async def get_user_adress_info(self, user_id):
         """Получаем инфу о пользователе для создания заказа"""
@@ -749,6 +789,26 @@ WHERE order_id = {order_id}"""
             """
         )
 
+    async def get_active_bonus_orders_by_location_id(self, location_id):
+        """Получаем заказы для локации"""
+        return await self.pool.fetch(
+            f"""
+            SELECT *
+            FROM bonus_orders 
+            WHERE bonus_location_id = {location_id} AND bonus_order_status = 'Подтвержден, готовится'
+            """
+        )
+
+    async def get_ready_bonus_orders_by_location_id(self, location_id):
+        """Получаем заказы для локации"""
+        return await self.pool.fetch(
+            f"""
+            SELECT *
+            FROM bonus_orders 
+            WHERE bonus_location_id = {location_id} AND bonus_order_status = 'Готов'
+            """
+        )
+
     async def get_unaccepted_orders_by_location_id(self, location_id):
         """Получаем заказы для локации"""
         return await self.pool.fetch(
@@ -812,7 +872,7 @@ WHERE order_id = {order_id}"""
             f"""
             SELECT order_id, deliver_to, order_info, order_status, order_price, order_user_telegram_id
             FROM orders 
-            WHERE order_location_id = {location_id} AND order_status = 'Заказ готов'
+            WHERE order_location_id = {location_id} AND order_status = 'Заказ готов' AND delivery_method = 'Заберу сам'
             order by deliver_to
             """
         )
@@ -829,7 +889,10 @@ WHERE order_id = {order_id}"""
                 f"SELECT number_of_orders, inviter_id  FROM users WHERE user_telegram_id = {user_id}"
             )
             num_orders = num_user_and_inviter_id['number_of_orders']
-            inviter_id = int(num_user_and_inviter_id['inviter_id'])
+            try:
+                inviter_id = int(num_user_and_inviter_id['inviter_id'])
+            except:
+                inviter_id = None
             print(inviter_id)
             if inviter_id:
                 num_orders_and_bonus = await self.pool.fetchrow(
@@ -911,4 +974,930 @@ WHERE order_id = {order_id}"""
             user_local_object_id = {user_local_object_id}
             WHERE user_telegram_id = {user_id}
             """
+        )
+
+    async def get_count_bonuses(self, user_id):
+        """Получаем количество доступных бонусов"""
+        return await self.pool.fetchval(
+            f'SELECT bonus FROM users WHERE user_telegram_id = {user_id}'
+        )
+
+    async def get_location_address_by_user(self, user_id):
+        """Достаем адес локации"""
+        location_id = await self.pool.fetchval(
+            f'SELECT user_location_id FROM users WHERE user_telegram_id = {user_id}'
+        )
+        return await self.pool.fetchval(
+            f'SELECT location_address FROM locations WHERE location_id = {location_id}'
+        )
+
+    async def get_user_location_id(self, user_id):
+        """Получаем id локации пользователя"""
+        return await self.pool.fetchval(
+            f'SELECT user_location_id FROM users WHERE user_telegram_id = {user_id}'
+        )
+
+    async def add_bonus_order(self,
+                              bonus_order_user_telegram_id,
+                              bonus_location_id,
+                              bonus_quantity,
+                              bonus_order_status):
+        """Формируем бунусный заказ"""
+        sql = """
+                INSERT INTO bonus_orders (bonus_order_user_telegram_id, bonus_location_id, bonus_quantity, 
+                bonus_order_status) 
+                VALUES ($1, $2, $3, $4)"""
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, bonus_order_user_telegram_id, bonus_location_id, bonus_quantity,
+                                        bonus_order_status)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+
+    async def get_bonus_order_info(self, user_id):
+        """Получаем инфу о последнем бонусном заказе"""
+        return await self.pool.fetchrow(
+            f"SELECT * FROM bonus_orders "
+            f"WHERE bonus_order_user_telegram_id = {user_id} AND bonus_order_status = 'Ожидание продавца'"
+            f"ORDER BY -bonus_order_id"
+        )
+
+    async def get_bonus_order_info_by_id(self, order_id):
+        """Получаем инфу о последнем бонусном заказе"""
+        return await self.pool.fetchrow(
+            f"SELECT * FROM bonus_orders "
+            f"WHERE bonus_order_id = {order_id}"
+        )
+
+    async def set_bonus_order_status(self, order_id, status):
+        """Меняем статус бонусного заказа"""
+        await self.pool.execute(
+            f"UPDATE bonus_orders SET bonus_order_status = '{status}' WHERE bonus_order_id = {order_id}"
+        )
+
+    async def change_bonus_minus(self, user_id, count_bonus):
+        """Меняем количество бонусов"""
+        bonus = await self.pool.fetchval(
+            f'SELECT bonus FROM users WHERE user_telegram_id = {user_id}'
+        )
+        new_bonus = bonus - count_bonus
+        await self.pool.execute(
+            f'UPDATE users SET bonus = {new_bonus} WHERE user_telegram_id = {user_id}'
+        )
+
+    async def change_bonus_plus(self, user_id, count_bonus):
+        """Меняем количество бонусов"""
+        bonus = await self.pool.fetchval(
+            f'SELECT bonus FROM users WHERE user_telegram_id = {user_id}'
+        )
+        new_bonus = bonus + count_bonus
+        await self.pool.execute(
+            f'UPDATE users SET bonus = {new_bonus} WHERE user_telegram_id = {user_id}'
+        )
+
+    async def get_bonus_order_status(self, b_order_id):
+        """Получаем статус бонусного заказа"""
+        return await self.pool.fetchval(
+            f"SELECT bonus_order_status FROM bonus_orders WHERE bonus_order_id = {b_order_id}"
+        )
+
+    async def add_admin(self, admin_telegram_id, admin_name):
+        """Добавляем админа"""
+        sql = """
+                INSERT INTO admins (admin_telegram_id, admin_name) 
+                VALUES ($1, $2)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, admin_telegram_id, admin_name)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        return done
+
+    async def add_seller_admin_without_location(self, admin_telegram_id, admin_name):
+        """Добавляем админа без привязки к локации"""
+        sql = """
+                INSERT INTO admin_sellers (admin_seller_telegram_id, admin_seller_name) 
+                VALUES ($1, $2)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, admin_telegram_id, admin_name)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        return done
+
+    async def add_seller_without_location(self, telegram_id, name):
+        """Добавляем продавца без привязки к локации"""
+        sql = """
+                INSERT INTO sellers (seller_telegram_id, seller_name) 
+                VALUES ($1, $2)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, telegram_id, name)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        return done
+
+    async def add_courier_without_location(self, telegram_id, name):
+        """Добавляем курьера без привязки к локации"""
+        sql = """
+                INSERT INTO couriers (courier_telegram_id, courier_name) 
+                VALUES ($1, $2)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, telegram_id, name)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        return done
+
+    async def add_seller_admin(self, admin_telegram_id, admin_name, metro_id, location_id):
+        """Добавляем админа с привязкой к локации"""
+        sql = """
+                INSERT INTO admin_sellers (admin_seller_telegram_id, admin_seller_name, admin_seller_metro_id, 
+                admin_seller_location_id) 
+                VALUES ($1, $2, $3, $4)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, admin_telegram_id, admin_name, metro_id, location_id)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        return done
+
+    async def add_seller(self, telegram_id, name, metro_id, location_id):
+        """Добавляем продавца с привязкой к локации"""
+        sql = """
+                INSERT INTO sellers (seller_telegram_id, seller_name, seller_metro_id, 
+                seller_location_id) 
+                VALUES ($1, $2, $3, $4)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, telegram_id, name, metro_id, location_id)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        return done
+
+    async def add_courier(self, telegram_id, name, metro_id, location_id):
+        """Добавляем курьера с привязкой к локации"""
+        sql = """
+                INSERT INTO couriers (courier_telegram_id, courier_name, courier_metro_id, 
+                courier_location_id) 
+                VALUES ($1, $2, $3, $4)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, telegram_id, name, metro_id, location_id)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        return done
+
+    async def is_admin(self, user_id):
+        """Проверяем админ или нет"""
+        return await self.pool.fetchval(
+            f'SELECT EXISTS(SELECT admin_telegram_id FROM admins WHERE admin_telegram_id = {user_id})'
+        )
+
+    async def is_seller_admin(self, user_id):
+        """Проверяем админ или нет"""
+        return await self.pool.fetchval(
+            f'SELECT EXISTS(SELECT admin_seller_telegram_id FROM admin_sellers WHERE admin_seller_telegram_id = {user_id})'
+        )
+
+    async def is_seller(self, user_id):
+        """Проверяем админ или нет"""
+        return await self.pool.fetchval(
+            f'SELECT EXISTS(SELECT seller_telegram_id FROM sellers WHERE seller_telegram_id = {user_id})'
+        )
+
+    async def is_courier(self, user_id):
+        """Проверяем админ или нет"""
+        return await self.pool.fetchval(
+            f'SELECT EXISTS(SELECT courier_telegram_id FROM couriers WHERE courier_telegram_id = {user_id})'
+        )
+
+    async def is_client(self, user_id):
+        """Проверяем админ или нет"""
+        return await self.pool.fetchval(
+            f'SELECT EXISTS(SELECT user_telegram_id FROM users WHERE user_telegram_id = {user_id})'
+        )
+
+    async def get_all_admin(self):
+        """Получаем список админов"""
+        return await self.pool.fetch(
+            "SELECT * FROM admins ORDER BY admin_id"
+        )
+
+    async def delete_admin(self, admin_id):
+        """Удаляем админа"""
+        await self.pool.execute(
+            f"DELETE FROM admins WHERE admin_id = {admin_id}"
+        )
+
+    async def add_metro(self, metro_name):
+        """Добавляем метро"""
+        sql = """
+                INSERT INTO metro (metro_name) 
+                VALUES ($1)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, metro_name)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+
+    async def get_all_metro(self):
+        """Получаем список метро"""
+        return await self.pool.fetch(
+            "SELECT * FROM metro ORDER BY metro_id"
+        )
+
+    async def get_last_metro_id(self):
+        """Получаем id последней добавленной ветки метро"""
+        return await self.pool.fetchval(
+            "SELECT metro_id FROM metro ORDER BY -metro_id"
+        )
+
+    async def get_metro_name_by_id(self, metro_id):
+        """Получаем название ветки метро по id"""
+        return await self.pool.fetchval(
+            f"SELECT metro_name FROM metro WHERE metro_id = {metro_id}"
+        )
+
+    async def delete_metro(self, metro_id):
+        """Удаляем метро"""
+        await self.pool.execute(
+            f"DELETE FROM metro WHERE metro_id = {metro_id}"
+        )
+
+    async def add_location(self, new_location):
+        """Добавляем локацию"""
+        sql = """
+                INSERT INTO locations (location_name, location_address, location_metro_id) 
+                VALUES ($1, $2, $3)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, new_location['location_name'], new_location['location_address'],
+                                        new_location['metro_id'])
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        location_id = await self.pool.fetchval(
+            "SELECT location_id FROM locations ORDER BY -location_id"
+        )
+        print(location_id)
+        category_ids = await self.pool.fetch(
+            f"SELECT category_id FROM categories"
+        )
+        print(category_ids)
+        for category in category_ids:
+            sql_category = """
+                            INSERT INTO locations_categories (lc_location_id, lc_category_id) 
+                            VALUES ($1, $2)
+                          """
+            done_cat = False
+            count_cat = 0
+            while not done_cat:
+                if count_cat == 15:
+                    break
+                try:
+                    await self.pool.execute(sql_category, location_id, category['category_id'])
+                    done_cat = True
+                except asyncpg.exceptions.UniqueViolationError:
+                    count_cat += 1
+
+        product_ids = await self.pool.fetch(
+            f"SELECT product_id FROM products"
+        )
+        print(product_ids)
+        for product in product_ids:
+            sql_category = """
+                            INSERT INTO locations_products (lp_location_id, lp_product_id) 
+                            VALUES ($1, $2)
+                          """
+            done_cat = False
+            count_cat = 0
+            while not done_cat:
+                if count_cat == 15:
+                    break
+                try:
+                    await self.pool.execute(sql_category, location_id, product['product_id'])
+                    done_cat = True
+                except asyncpg.exceptions.UniqueViolationError:
+                    count_cat += 1
+        product_size_ids = await self.pool.fetch(
+            f"SELECT size_id FROM product_sizes"
+        )
+        print(product_size_ids)
+        for size_id in product_size_ids:
+            sql_category = """
+                                    INSERT INTO locations_product_sizes (lps_location_id, lps_size_product_id) 
+                                    VALUES ($1, $2)
+                                  """
+            done_cat = False
+            count_cat = 0
+            while not done_cat:
+                if count_cat == 15:
+                    break
+                try:
+                    await self.pool.execute(sql_category, location_id, size_id['size_id'])
+                    done_cat = True
+                except asyncpg.exceptions.UniqueViolationError:
+                    count_cat += 1
+
+    async def get_list_of_locations(self):
+        """Получаем список локаций"""
+        return await self.pool.fetch(
+            "SELECT * FROM local_objects ORDER BY local_object_id"
+        )
+
+    async def get_list_of_categories(self):
+        """Получаем список категорий"""
+        return await self.pool.fetch(
+            "SELECT * FROM categories ORDER BY category_id"
+        )
+
+    async def get_list_of_local_object(self):
+        """Получаем список локаций"""
+        return await self.pool.fetch(
+            "SELECT * FROM locations ORDER BY location_id"
+        )
+
+    async def get_metro_name_by_location_metro_id(self, location_metro_id):
+        """Получаем название ветки метро"""
+        return await self.pool.fetchval(
+            f"SELECT metro_name FROM metro WHERE metro_id = {location_metro_id}"
+        )
+
+    async def delete_location_by_id(self, location_id):
+        """Удаляем локацию"""
+        await self.pool.execute(
+            f"DELETE FROM locations WHERE location_id = {location_id}"
+        )
+
+    async def delete_local_object_by_id(self, local_object_id):
+        """Удаляем локацию"""
+        await self.pool.execute(
+            f"DELETE FROM local_objects WHERE local_object_id = {local_object_id}"
+        )
+
+    async def delete_category_by_id(self, category_id):
+        """Удаляем категорию"""
+        await self.pool.execute(
+            f"DELETE FROM categories WHERE category_id = {category_id}"
+        )
+
+    async def delete_seller_admin_by_id(self, sa_id):
+        """Удаляем админа локации"""
+        await self.pool.execute(
+            f"DELETE FROM admin_sellers WHERE admin_seller_id = {sa_id}"
+        )
+
+    async def reset_seller_admin_by_id(self, sa_id):
+        """Сбрасываем админа локации"""
+        await self.pool.execute(
+            f"""UPDATE admin_sellers SET admin_seller_metro_id=NULL, admin_seller_location_id=NULL
+WHERE admin_seller_id = {sa_id}"""
+        )
+
+    async def reset_seller_by_id(self, sa_id):
+        """Сбрасываем продавца"""
+        await self.pool.execute(
+            f"""UPDATE sellers SET seller_metro_id=NULL, seller_location_id=NULL
+    WHERE seller_id = {sa_id}"""
+        )
+
+    async def reset_courier_by_id(self, sa_id):
+        """Сбрасываем курьера"""
+        await self.pool.execute(
+            f"""UPDATE couriers SET courier_metro_id=NULL, courier_location_id=NULL
+    WHERE courier_id = {sa_id}"""
+        )
+
+    async def delete_seller_by_id(self, seller_id):
+        """Удаляем продавца"""
+        await self.pool.execute(
+            f"DELETE FROM sellers WHERE seller_id = {seller_id}"
+        )
+
+    async def delete_courier_by_id(self, courier_id):
+        """Удаляем курьера"""
+        await self.pool.execute(
+            f"DELETE FROM couriers WHERE courier_id = {courier_id}"
+        )
+
+    async def delete_product_by_id(self, product_id):
+        """Удаляем категорию"""
+        await self.pool.execute(
+            f"DELETE FROM products WHERE product_id = {product_id}"
+        )
+
+    async def remove_from_stock_category(self, category_id):
+        """Убираем с продажи категорию"""
+        await self.pool.execute(
+            f"""UPDATE categories SET is_category_available=false WHERE category_id = {category_id}"""
+        )
+
+    async def return_to_stock_category(self, category_id):
+        """Возвращаем категорию в продажу"""
+        await self.pool.execute(
+            f"""UPDATE categories SET is_category_available=true WHERE category_id = {category_id}"""
+        )
+
+    async def remove_from_stock_item(self, product_id):
+        """Убираем с продажи товар"""
+        await self.pool.execute(
+            f"""UPDATE products SET is_product_available=false WHERE product_id = {product_id}"""
+        )
+
+    async def return_to_stock_item(self, product_id):
+        """Возвращаем в продажу товар"""
+        await self.pool.execute(
+            f"""UPDATE products SET is_product_available=true WHERE product_id = {product_id}"""
+        )
+
+    async def return_to_stock_item(self, product_id):
+        """Возвращаем в продажу товар"""
+        await self.pool.execute(
+            f"""UPDATE products SET is_product_available=true WHERE product_id = {product_id}"""
+        )
+
+    async def add_local_object(self, local_object_name, local_object_info):
+        """Добавляем объект локальной доставки"""
+        sql = """
+                INSERT INTO local_objects (local_object_name, local_object_location_id, local_object_metro_id) 
+                VALUES ($1, $2, $3)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, local_object_name, local_object_info['location_id'],
+                                        local_object_info['metro_id'])
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+
+    async def get_local_objects_list(self):
+        """Получаем список объектов доставки"""
+        return await self.pool.fetch(
+            f"""SELECT * 
+FROM local_objects 
+JOIN locations ON locations.location_id = local_objects.local_object_location_id
+ORDER BY local_object_location_id
+"""
+        )
+
+    async def get_category_list(self):
+        """Получаем список категорий"""
+        return await self.pool.fetch(
+            f"""SELECT * FROM categories ORDER BY category_id"""
+        )
+
+    async def get_seller_admins_list(self):
+        """Получаем список админов локаций"""
+        return await self.pool.fetch(
+            f"""SELECT * FROM admin_sellers ORDER BY admin_seller_id"""
+        )
+
+    async def get_seller_list(self):
+        """Получаем список Продавцов локаций"""
+        return await self.pool.fetch(
+            f"""SELECT * FROM sellers ORDER BY seller_id"""
+        )
+
+    async def get_courier_list(self):
+        """Получаем список Продавцов локаций"""
+        return await self.pool.fetch(
+            f"""SELECT * FROM couriers ORDER BY courier_id"""
+        )
+
+    async def get_courier_list(self):
+        """Получаем список курьеров"""
+        return await self.pool.fetch(
+            f"""SELECT * FROM couriers ORDER BY courier_id"""
+        )
+
+    async def get_products_list(self, category_id):
+        """Получаем список категорий"""
+        return await self.pool.fetch(
+            f"""SELECT product_id, product_name FROM products  WHERE product_category_id={category_id}
+ORDER BY product_id"""
+        )
+
+    async def get_count_products(self, category_id):
+        """Получаем количество товаров в категории"""
+        return await self.pool.fetchval(
+            f"SELECT COUNT(*) from products where product_category_id={category_id}"
+        )
+
+    async def add_category(self, category_name):
+        """Добавляем категорию"""
+        sql = """
+                INSERT INTO categories (category_name) 
+                VALUES ($1)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, category_name)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        category_id = await self.pool.fetchval(
+            f"SELECT category_id FROM categories ORDER BY -category_id"
+        )
+        location_ids = await self.pool.fetch(
+            f"SELECT location_id FROM locations"
+        )
+        for location in location_ids:
+            sql_category = """
+        INSERT INTO locations_categories (lc_location_id, lc_category_id) 
+        VALUES ($1, $2)
+                                  """
+            done_cat = False
+            count_cat = 0
+            while not done_cat:
+                if count_cat == 15:
+                    break
+                try:
+                    await self.pool.execute(sql_category, location['location_id'], category_id)
+                    done_cat = True
+                except asyncpg.exceptions.UniqueViolationError:
+                    count_cat += 1
+
+    async def get_category_name_by_id(self, category_id):
+        """Получааем название категории"""
+        return await self.pool.fetchval(
+            f"SELECT category_name FROM categories WHERE category_id = {category_id}"
+        )
+
+    async def add_product(self, product_data):
+        """Добавляем товар"""
+        sql = """
+                INSERT INTO products (product_category_id, product_name, product_description, product_photo_id,
+                price_1, price_2, price_3, price_4, price_5, price_6) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, product_data['category_id'],
+                                        product_data['item_name'],
+                                        product_data['item_description'],
+                                        product_data['photo_id'],
+                                        product_data['prices']['price1'],
+                                        product_data['prices']['price2'],
+                                        product_data['prices']['price3'],
+                                        product_data['prices']['price4'],
+                                        product_data['prices']['price5'],
+                                        product_data['prices']['price6'])
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        product_id = await self.pool.fetchval(
+            f"SELECT product_id FROM products ORDER BY -product_id"
+        )
+        location_ids = await self.pool.fetch(
+            f"SELECT location_id FROM locations"
+        )
+        for location in location_ids:
+            sql_category = """
+        INSERT INTO locations_products (lp_location_id, lp_product_id) 
+        VALUES ($1, $2)
+                                  """
+            done_cat = False
+            count_cat = 0
+            while not done_cat:
+                if count_cat == 15:
+                    break
+                try:
+                    await self.pool.execute(sql_category, location['location_id'], product_id)
+                    done_cat = True
+                except asyncpg.exceptions.UniqueViolationError:
+                    count_cat += 1
+
+    async def add_product_with_size(self, product_data):
+        """Добавляем товар"""
+        sql = """
+                INSERT INTO products (product_category_id, product_name, product_description, product_photo_id) 
+                VALUES ($1, $2, $3, $4)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, product_data['category_id'],
+                                        product_data['item_name'],
+                                        product_data['item_description'],
+                                        product_data['photo_id'])
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        product_id = await self.pool.fetchval(
+            f"SELECT product_id FROM products ORDER BY -product_id"
+        )
+        location_ids = await self.pool.fetch(
+            f"SELECT location_id FROM locations"
+        )
+        for location in location_ids:
+            sql_category = """
+        INSERT INTO locations_products (lp_location_id, lp_product_id) 
+        VALUES ($1, $2)
+                                  """
+            done_cat = False
+            count_cat = 0
+            while not done_cat:
+                if count_cat == 15:
+                    break
+                try:
+                    await self.pool.execute(sql_category, location['location_id'], product_id)
+                    done_cat = True
+                except asyncpg.exceptions.UniqueViolationError:
+                    count_cat += 1
+        return product_id
+
+    async def add_product_size(self, size_product_id, size_name, prices):
+        """Добавляем размер товара товар"""
+        sql = """
+                INSERT INTO product_sizes (size_product_id, size_name, price_1, price_2, price_3, price_4, price_5, 
+                price_6) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, size_product_id,
+                                        size_name,
+                                        prices['price1'],
+                                        prices['price2'],
+                                        prices['price3'],
+                                        prices['price4'],
+                                        prices['price5'],
+                                        prices['price6'])
+                done = True
+            except asyncpg.exceptions.UniqueViolationError:
+                count += 1
+        size_id = await self.pool.fetchval(
+            f"SELECT size_id FROM product_sizes ORDER BY -size_id"
+        )
+        location_ids = await self.pool.fetch(
+            f"SELECT location_id FROM locations"
+        )
+        for location in location_ids:
+            sql_category = """
+        INSERT INTO locations_product_sizes (lps_location_id, lps_size_product_id) 
+        VALUES ($1, $2)
+                                  """
+            done_cat = False
+            count_cat = 0
+            while not done_cat:
+                if count_cat == 15:
+                    break
+                try:
+                    await self.pool.execute(sql_category, location['location_id'], size_id)
+                    done_cat = True
+                except asyncpg.exceptions.UniqueViolationError:
+                    count_cat += 1
+
+    async def get_product_info(self, product_id):
+        """Получаем информацию о товаре"""
+        return await self.pool.fetchrow(
+            f"SELECT * FROM products WHERE product_id = {product_id}"
+        )
+
+    async def get_product_sizes(self, product_id):
+        """Получаем размеры товара"""
+        return await self.pool.fetch(
+            f"SELECT * FROM product_sizes WHERE size_product_id = {product_id}"
+        )
+
+    async def get_category_for_admin_true(self):
+        """Выбираем все категории, доступные для проажи"""
+        return await self.pool.fetch(
+            f"""SELECT category_id, category_name FROM categories WHERE is_category_available=true ORDER BY category_id"""
+        )
+
+    async def get_category_for_admin_false(self):
+        """Выбираем все категории, снятые с проажи"""
+        return await self.pool.fetch(
+            f"""SELECT category_id, category_name FROM categories WHERE is_category_available=false ORDER BY category_id"""
+        )
+
+    async def get_category_for_admin(self):
+        """Выбираем все категории, в которых есть снятые с продажи товары"""
+        return await self.pool.fetch(
+            f"""SELECT category_id, category_name 
+FROM categories
+JOIN products ON product_category_id=category_id
+WHERE is_product_available = false ORDER BY product_category_id"""
+        )
+
+    async def get_category_for_remove_item_from_stock(self):
+        """Выбираем все категории, в которых есть товары в продаже"""
+        return await self.pool.fetch(
+            f"""SELECT category_id, category_name 
+    FROM categories
+    JOIN products ON product_category_id=category_id
+    WHERE is_product_available = true ORDER BY product_category_id"""
+        )
+
+    async def get_products_for_remove_from_stock(self, category_id):
+        """Выбираем товары из категории чтобы свять с продажи"""
+        return await self.pool.fetch(
+            f"""SELECT product_id, product_name FROM products
+WHERE product_category_id = {category_id} AND is_product_available = true ORDER BY product_id"""
+        )
+
+    async def get_products_for_return_to_stock(self, category_id):
+        """Выбираем товары из категории"""
+        return await self.pool.fetch(
+            f"""SELECT product_id, product_name FROM products
+    WHERE product_category_id = {category_id} AND is_product_available = false ORDER BY product_id"""
+        )
+
+    async def change_seller_admin_location(self, seller_admin_id, metro_id, location_id):
+        """Меняем привязку к локации у продавца админа"""
+        await self.pool.execute(
+            f"""UPDATE admin_sellers SET admin_seller_metro_id={metro_id}, admin_seller_location_id={location_id}
+WHERE admin_seller_id={seller_admin_id}"""
+        )
+
+    async def change_seller_location(self, seller_id, metro_id, location_id):
+        """Меняем привязку к локации у продавца"""
+        await self.pool.execute(
+            f"""UPDATE sellers SET seller_metro_id={metro_id}, seller_location_id={location_id}
+    WHERE seller_id={seller_id}"""
+        )
+
+    async def change_courier_location(self, courier_id, metro_id, location_id):
+        """Меняем привязку к локации у курьера"""
+        await self.pool.execute(
+            f"""UPDATE couriers SET courier_metro_id={metro_id}, courier_location_id={location_id}
+    WHERE courier_id={courier_id}"""
+        )
+
+    async def get_seller_admin_name_id(self, seller_admin_id):
+        """Получаем имя и tg_id"""
+        return await self.pool.fetchrow(
+            f"""SELECT admin_seller_name, admin_seller_telegram_id FROM admin_sellers
+WHERE admin_seller_id={seller_admin_id}"""
+        )
+
+    async def get_seller_name_id(self, seller_id):
+        """Получаем имя и tg_id"""
+        return await self.pool.fetchrow(
+            f"""SELECT seller_name, seller_telegram_id FROM sellers
+    WHERE seller_id={seller_id}"""
+        )
+
+    async def get_courier_name_id(self, courier_id):
+        """Получаем имя и tg_id"""
+        return await self.pool.fetchrow(
+            f"""SELECT courier_name, courier_telegram_id FROM couriers
+    WHERE courier_id={courier_id}"""
+        )
+
+    async def edit_metro_name(self, metro_id, metro_name):
+        """Меняем название станции метро"""
+        await self.pool.execute(
+            f"""UPDATE metro SET metro_name='{metro_name}' WHERE metro_id={metro_id}"""
+        )
+
+    async def get_categories_with_products(self):
+        """Все категории, в которых есть товары"""
+        return await self.pool.fetch(
+            f"""SELECT category_id, category_name 
+FROM categories
+JOIN products ON product_category_id=category_id ORDER BY product_category_id"""
+        )
+
+    async def product_has_size(self, product_id):
+        """Проверяем есть ли у товара размеры"""
+        return await self.pool.fetchval(
+            f"SELECT EXISTS(SELECT size_product_id FROM product_sizes WHERE size_product_id={product_id})"
+        )
+
+    async def edit_product_name(self, product_id, product_name):
+        """Обновляем название товара"""
+        await self.pool.execute(
+            f"""UPDATE products SET product_name='{product_name}' WHERE product_id={product_id}"""
+        )
+
+    async def edit_product_description(self, product_id, product_description):
+        """Обновляем описание товара"""
+        await self.pool.execute(
+            f"""UPDATE products SET product_description='{product_description}' WHERE product_id={product_id}"""
+        )
+
+    async def edit_product_photo(self, product_id, product_photo_id):
+        """Обновляем фотографию товара"""
+        await self.pool.execute(
+            f"""UPDATE products SET product_photo_id='{product_photo_id}' WHERE product_id={product_id}"""
+        )
+
+    async def edit_product_prices(self, product_id, prices):
+        """Обновляем цены товара"""
+        await self.pool.execute(
+            f"""UPDATE products SET price_1={prices['price1']}, price_2={prices['price2']}, price_3={prices['price3']},
+price_4={prices['price4']}, price_5={prices['price5']}, price_6={prices['price6']}
+WHERE product_id={product_id}"""
+        )
+
+    async def item_is_available(self, product_id):
+        """Проверяем в продаже товар или нет"""
+        return await self.pool.fetchval(
+            f"""SELECT is_product_available FROM products WHERE product_id={product_id}"""
+        )
+
+    async def remove_size_by_id(self, size_id):
+        """Удаляем размер"""
+        await self.pool.execute(
+            f"""DELETE FROM product_sizes WHERE size_id = {size_id}"""
+        )
+
+    async def get_size_info_by_id(self, size_id):
+        """Получаем инфу о размере"""
+        return await self.pool.fetchrow(
+            f"""SELECT * FROM product_sizes WHERE size_id = {size_id}"""
+        )
+
+    async def edit_size_name(self, size_id, size_name):
+        """Меняем название размера"""
+        await self.pool.execute(
+            f"""UPDATE product_sizes SET size_name='{size_name}' WHERE size_id={size_id}"""
+        )
+
+    async def edit_size_prices(self, size_id, prices):
+        """Меняем цены размера"""
+        await self.pool.execute(
+            f"""UPDATE product_sizes SET price_1={prices['price1']}, price_2={prices['price2']}, 
+price_3={prices['price3']}, price_4={prices['price4']}, price_5={prices['price5']}, price_6={prices['price6']}
+WHERE size_id={size_id}"""
         )
