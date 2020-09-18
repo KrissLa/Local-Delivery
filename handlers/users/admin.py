@@ -21,6 +21,79 @@ from utils.temp_orders_list import get_list_of_location_message, get_list_of_loc
     get_list_of_products_for_edit, get_sizes_for_remove, get_sizes_for_edit
 
 
+@dp.message_handler(IsAdminMessage(), commands=['publish_post'])
+async def publish_post(message: types.Message):
+    """Создаем промо пост"""
+    await message.answer('Загрузите фотографию',
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.PromoPhoto.set()
+
+
+@dp.message_handler(state=AddAdmin.PromoPhoto, content_types=ContentTypes.PHOTO)
+async def get_promo_photo(message: types.Message, state: FSMContext):
+    """Получаем фото"""
+    photo_id = message.photo[-1].file_id
+    await state.update_data(photo_id=photo_id)
+    await message.answer('Готово. Теперь введите подпись к фото.',
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.PromoCaption.set()
+
+
+@dp.message_handler(state=AddAdmin.PromoCaption)
+async def get_caption(message: types.Message, state: FSMContext):
+    """Получаем подпись"""
+    caption = message.text
+    await state.update_data(caption=caption)
+    data = await state.get_data()
+    photo_id = data.get('photo_id')
+    await message.answer('Вот так будет выглядеть пост:\n\n\n')
+    await bot.send_photo(message.from_user.id,
+                         photo=photo_id,
+                         caption=caption)
+    await message.answer('\n\nЧтобы отправить нажмите /send_publish_post',
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.PromoConfirm.set()
+
+
+@dp.message_handler(state=AddAdmin.PromoConfirm, commands=['send_publish_post'])
+async def send_publish_post(message: types.Message, state: FSMContext):
+    """Отправляем пост"""
+    user_list = await db.get_users_id()
+    data = await state.get_data()
+    photo_id = data.get('photo_id')
+    caption = data.get('caption')
+    count = 0
+    count_error = 0
+    for user in user_list:
+        try:
+            await bot.send_photo(user['user_telegram_id'],
+                                 photo=photo_id,
+                                 caption=caption)
+            count += 1
+        except:
+            count_error += 1
+    await message.answer(f'Пост отправлен.\n'
+                         f'Успешно - {count} сообщений.\n'
+                         f'Ошибок - {count_error}.')
+    await state.finish()
+
+@dp.message_handler(IsAdminMessage(), commands=['set_about'])
+async def set_about(message: types.Message):
+    """Добавить/изменить информацию о компании"""
+    await message.answer('Введите информацию о компании',
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.SetAbout.set()
+
+
+@dp.message_handler(state=AddAdmin.SetAbout)
+async def get_about(message: types.Message, state: FSMContext):
+    """ПОлучаем информацию о компании"""
+    about = message.text
+    await db.set_about(about)
+    await message.answer('Новое описание компании сохранено')
+    await state.finish()
+
+
 @dp.message_handler(IsAdminMessage(), commands=['add_admin'])
 async def add_admin(message: types.Message):
     """Добавляем админа"""
@@ -46,16 +119,18 @@ async def get_admin_name(message: types.Message, state: FSMContext):
 @dp.message_handler(state=AddAdmin.WaitId)
 async def get_admin_id(message: types.Message, state: FSMContext):
     """Получаем id админа"""
-    new_id = int(message.text)
-    data = await state.get_data()
-    name = data.get('name')
     try:
+        new_id = int(message.text)
+        data = await state.get_data()
+        name = data.get('name')
+
         await bot.send_message(new_id, 'Вам назначили должность "админ"')
         if await db.add_admin(new_id, name):
             await message.answer('Админ успешно добавлен. Посмотреть всех: /admins')
             await state.finish()
         else:
             await message.answer('Админ с таким id уже добавлен')
+            await state.finish()
     except:
         await message.answer('Не получается добавить пользователя. Возможно он не отправил боту сообщение.'
                              'Попробуйте еще раз.',
@@ -408,9 +483,13 @@ async def remove_category_by_id(message: types.Message, state: FSMContext):
 async def add_item(message: types.Message):
     """Добавить товар"""
     categories = await db.get_list_of_categories()
-    await message.answer("Выберите категорию",
+    if categories:
+        await message.answer("Выберите категорию",
                          reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
-    await AddAdmin.ItemCategory.set()
+        await AddAdmin.ItemCategory.set()
+    else:
+        await message.answer("Пока нет категорий. Чтобы добавить нажмите /add_category")
+
 
 
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.ItemCategory)
@@ -2536,7 +2615,11 @@ async def back_to_edit(call: CallbackQuery, state: FSMContext):
                                                  AddAdmin.ChangeSellerLocation,
                                                  AddAdmin.ChangeCourier,
                                                  AddAdmin.ChangeCourierMetro,
-                                                 AddAdmin.ChangeCourierLocation])
+                                                 AddAdmin.ChangeCourierLocation,
+                                                 AddAdmin.SetAbout,
+                                                 AddAdmin.PromoPhoto,
+                                                 AddAdmin.PromoCaption,
+                                                 AddAdmin.PromoConfirm])
 async def cancel_add_admin(call: CallbackQuery, state: FSMContext):
     """Кнопка отмены"""
     await call.message.edit_reply_markup()

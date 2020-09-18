@@ -4,6 +4,7 @@ from data.config import admins
 from handlers import dp
 from loader import db
 from utils.notify_admins import on_startup_notify
+from utils.set_bot_commands import set_default_commands
 
 
 async def on_startup(dp):
@@ -30,12 +31,9 @@ async def on_startup(dp):
     await db.create_table_orders()
     await db.create_table_temp_orders()
     await db.create_table_bonus_orders()
-    print("Готово")
-    print("Пытаюсь добавить админов")
+    await db.create_table_about()
     await db.add_admin(admins, 'Главный админ')
-
-
-    print("Готово")
+    await set_default_commands(dp)
 
     await on_startup_notify(dp)
 

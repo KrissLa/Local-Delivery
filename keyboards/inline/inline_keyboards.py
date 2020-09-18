@@ -448,6 +448,28 @@ delivery_options_markup = InlineKeyboardMarkup(
     ]
 )
 
+cart_markup = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text='С доставкой',
+                callback_data='delivery_option_delivery'
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text='Заберу сам',
+                callback_data='delivery_option_pickup'
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text='Очистить корзину и отменить заказ',
+                callback_data='cancel_order')
+        ]
+    ]
+)
+
 order_cancel_or_back_markup = InlineKeyboardMarkup(
     inline_keyboard=[
         [

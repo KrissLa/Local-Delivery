@@ -54,11 +54,41 @@ class IsCourierCallback(BoundFilter):
 
 class IsClientMessage(BoundFilter):
     async def check(self, message: types.Message):
-        """Проверка на курьера в сообщении"""
+        """Проверка на пользователя в сообщении"""
         return await db.is_client(message.from_user.id)
 
 
 class IsClientCallback(BoundFilter):
     async def check(self, call: types.CallbackQuery):
-        """Проверка на курьера в коллбеках"""
+        """Проверка на пользователя в коллбеках"""
         return await db.is_client(call.from_user.id)
+
+
+class IsNotClientMessage(BoundFilter):
+    async def check(self, message: types.Message):
+        """Проверка на пользователя в сообщении"""
+        return not await db.is_client(message.from_user.id)
+
+
+class IsNotClientCallback(BoundFilter):
+    async def check(self, call: types.CallbackQuery):
+        """Проверка на пользователя в коллбеках"""
+        return not await db.is_client(call.from_user.id)
+
+
+class HasNoLocation(BoundFilter):
+    async def check(self, message: types.Message):
+        """Пользователи, у которых удалилась локация"""
+        return not await db.has_location(message.from_user.id)
+
+
+class HasNoLocalObject(BoundFilter):
+    async def check(self, message: types.Message):
+        """Пользователи, у которых удалилась локация"""
+        return not await db.has_local_object(message.from_user.id)
+
+
+class HasNoMetro(BoundFilter):
+    async def check(self, message: types.Message):
+        """Пользователи, у которых удалилась локация"""
+        return not await db.has_metro(message.from_user.id)

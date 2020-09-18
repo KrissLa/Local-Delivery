@@ -288,6 +288,15 @@ class Database:
                    """
         await self.pool.execute(sql)
 
+    async def create_table_about(self):
+        """Создаем таблицу о компании"""
+        sql = """
+                   CREATE TABLE IF NOT EXISTS about (
+                   info TEXT
+                   );
+                   """
+        await self.pool.execute(sql)
+
     async def get_available_metro(self):
         """Получаем список доступных станций метро"""
         return await self.pool.fetch(
@@ -1225,6 +1234,36 @@ WHERE order_id = {order_id}"""
             f'SELECT EXISTS(SELECT user_telegram_id FROM users WHERE user_telegram_id = {user_id})'
         )
 
+    async def has_location(self, user_id):
+        """Проверяем админ или нет"""
+        location_id = await self.pool.fetchval(
+            f'SELECT user_location_id FROM users WHERE user_telegram_id = {user_id}'
+        )
+        if location_id:
+            return True
+        else:
+            return False
+
+    async def has_local_object(self, user_id):
+        """Проверяем админ или нет"""
+        local_object = await self.pool.fetchval(
+            f'SELECT user_local_object_id FROM users WHERE user_telegram_id = {user_id}'
+        )
+        if local_object:
+            return True
+        else:
+            return False
+
+    async def has_metro(self, user_id):
+        """Проверяем админ или нет"""
+        metro = await self.pool.fetchval(
+            f'SELECT user_metro_id FROM users WHERE user_telegram_id = {user_id}'
+        )
+        if metro:
+            return True
+        else:
+            return False
+
     async def get_all_admin(self):
         """Получаем список админов"""
         return await self.pool.fetch(
@@ -1449,6 +1488,34 @@ WHERE admin_seller_id = {sa_id}"""
         """Убираем с продажи категорию"""
         await self.pool.execute(
             f"""UPDATE categories SET is_category_available=false WHERE category_id = {category_id}"""
+        )
+
+    async def remove_from_stock_category_in_location(self, category_id, location_id):
+        """Убираем с продажи категорию в локации"""
+        await self.pool.execute(
+            f"""UPDATE locations_categories SET is_category_in_location_available=false 
+WHERE lc_category_id = {category_id} AND lc_location_id={location_id}"""
+        )
+
+    async def return_from_stock_category_in_location(self, category_id, location_id):
+        """Возвращем в продажу категорию в локации"""
+        await self.pool.execute(
+            f"""UPDATE locations_categories SET is_category_in_location_available=true 
+    WHERE lc_category_id = {category_id} AND lc_location_id={location_id}"""
+        )
+
+    async def remove_from_stock_product_in_location(self, product_id, location_id):
+        """Убираем с продажи категорию в локации"""
+        await self.pool.execute(
+            f"""UPDATE locations_products SET is_product_in_location_available=false 
+    WHERE lp_product_id = {product_id} AND lp_location_id={location_id}"""
+        )
+
+    async def return_to_stock_product_in_location(self, product_id, location_id):
+        """Убираем с продажи категорию в локации"""
+        await self.pool.execute(
+            f"""UPDATE locations_products SET is_product_in_location_available=true 
+    WHERE lp_product_id = {product_id} AND lp_location_id={location_id}"""
         )
 
     async def return_to_stock_category(self, category_id):
@@ -1741,7 +1808,8 @@ ORDER BY product_id"""
     async def get_category_for_admin_true(self):
         """Выбираем все категории, доступные для проажи"""
         return await self.pool.fetch(
-            f"""SELECT category_id, category_name FROM categories WHERE is_category_available=true ORDER BY category_id"""
+            f"""SELECT category_id, category_name FROM categories WHERE is_category_available=true 
+ORDER BY category_id"""
         )
 
     async def get_category_for_admin_false(self):
@@ -1753,19 +1821,19 @@ ORDER BY product_id"""
     async def get_category_for_admin(self):
         """Выбираем все категории, в которых есть снятые с продажи товары"""
         return await self.pool.fetch(
-            f"""SELECT category_id, category_name 
+            f"""SELECT DISTINCT category_id, category_name 
 FROM categories
 JOIN products ON product_category_id=category_id
-WHERE is_product_available = false ORDER BY product_category_id"""
+WHERE is_product_available = false ORDER BY category_id"""
         )
 
     async def get_category_for_remove_item_from_stock(self):
         """Выбираем все категории, в которых есть товары в продаже"""
         return await self.pool.fetch(
-            f"""SELECT category_id, category_name 
-    FROM categories
-    JOIN products ON product_category_id=category_id
-    WHERE is_product_available = true ORDER BY product_category_id"""
+            f"""SELECT DISTINCT  category_id, category_name 
+    FROM  products
+    JOIN categories ON product_category_id=category_id
+    WHERE is_product_available = true ORDER BY category_id"""
         )
 
     async def get_products_for_remove_from_stock(self, category_id):
@@ -1900,4 +1968,124 @@ WHERE product_id={product_id}"""
             f"""UPDATE product_sizes SET price_1={prices['price1']}, price_2={prices['price2']}, 
 price_3={prices['price3']}, price_4={prices['price4']}, price_5={prices['price5']}, price_6={prices['price6']}
 WHERE size_id={size_id}"""
+        )
+
+    async def get_location_by_seller_admin_id(self, seller_admin_id):
+        """Получаем id локации по id seller-admina"""
+        return await self.pool.fetchrow(
+            f"""SELECT admin_seller_location_id, admin_seller_metro_id FROM admin_sellers WHERE admin_seller_telegram_id = {seller_admin_id}"""
+        )
+
+    async def get_location_for_seller_admin(self, seller_admin_id):
+        """Получаем id локации по id seller-admina"""
+        return await self.pool.fetchval(
+            f"""SELECT admin_seller_location_id FROM admin_sellers WHERE admin_seller_telegram_id = {seller_admin_id}"""
+        )
+
+    async def get_seller_location(self, seller_id):
+        """Получаем id локации продацва"""
+        return await self.pool.fetchval(
+            f"""SELECT seller_location_id FROM sellers WHERE seller_id = {seller_id}"""
+        )
+
+    async def get_courier_location(self, courier_id):
+        """Получаем id локации курьера"""
+        return await self.pool.fetchval(
+            f"""SELECT courier_location_id FROM couriers WHERE courier_id = {courier_id}"""
+        )
+
+    async def get_sellers_list_by_location(self, location_id):
+        """Получаем список продавцов в локации"""
+        return await self.pool.fetch(
+            f"""SELECT seller_id, seller_name, seller_telegram_id FROM sellers WHERE seller_location_id={location_id}"""
+        )
+
+    async def get_courier_list_by_location(self, location_id):
+        """Получаем список курьеров в локации"""
+        return await self.pool.fetch(
+            f"""SELECT courier_id, courier_name, courier_telegram_id FROM couriers WHERE courier_location_id={location_id}"""
+        )
+
+    async def get_categories_in_stock_by_location(self, location_id, status):
+        """Получаем категорию, доступную для пользователя"""
+        return await self.pool.fetch(
+            f"""SELECT category_id, category_name 
+FROM locations_categories
+JOIN categories  ON lc_category_id=category_id
+WHERE  lc_location_id = {location_id}
+AND is_category_in_location_available = {status}
+ORDER BY category_id;"""
+        )
+
+    async def get_category_for_stock_item_in_location(self, location_id, status):
+        """Достаем категории с товарами"""
+        return await self.pool.fetch(
+            f"""SELECT DISTINCT category_id, category_name 
+FROM categories
+JOIN products ON product_category_id=category_id
+JOIN locations_products ON lp_product_id = product_id
+WHERE is_product_in_location_available = {status} 
+AND lp_location_id = {location_id}
+ORDER BY category_id;"""
+        )
+
+    async def get_products_for_stock_in_location(self, location_id, category_id, status):
+        """Получаем товары из категории"""
+        return await self.pool.fetch(
+            f"""SELECT product_id, product_name 
+FROM categories
+JOIN products ON product_category_id=category_id
+JOIN locations_products ON lp_product_id = product_id
+WHERE is_product_in_location_available = {status} 
+AND lp_location_id = {location_id}
+AND category_id = {category_id}
+ORDER BY product_category_id;"""
+        )
+
+    async def get_orders_for_user(self, user_id):
+        """Получаем активные ордеры"""
+        return await self.pool.fetch(
+            f"""SELECT order_id, deliver_to, delivery_method, order_info, order_price, order_status
+FROM orders WHERE order_user_telegram_id={user_id}
+AND order_status = 'Ожидание подтверждения продавца'
+OR order_status='Подтвержден, готовится' 
+OR order_status='Заказ готов'
+ORDER BY order_id"""
+        )
+
+    async def im_at_work_seller(self, user_id, status):
+        """Устанавливаем статус продавца"""
+        await self.pool.execute(
+            f"""UPDATE sellers SET seller_status={status} WHERE seller_telegram_id = {user_id}"""
+        )
+
+    async def im_at_work_courier(self, user_id, status):
+        """Устанавливаем статус продавца"""
+        await self.pool.execute(
+            f"""UPDATE couriers SET courier_status={status} WHERE courier_telegram_id = {user_id}"""
+        )
+
+    async def set_about(self, about):
+        """Добавляем/изменяем инфу о компании"""
+        await self.pool.execute(
+            f"""DELETE FROM about"""
+        )
+        sql = "INSERT INTO about (info) VALUES ($1)"
+        await self.pool.execute(sql, about)
+
+    async def get_about(self):
+        """Получаем инфу о компании"""
+        return await self.pool.fetchval(
+            f"""SELECT info FROM about"""
+        )
+    async def get_objects(self):
+        """Получаем список с названиями точек доставки"""
+        return await self.pool.fetch(
+            f"""SELECT local_object_name from local_objects"""
+        )
+
+    async def get_users_id(self):
+        """Получаем список пользователей"""
+        return await self.pool.fetch(
+            f"""SELECT user_telegram_id FROM users"""
         )

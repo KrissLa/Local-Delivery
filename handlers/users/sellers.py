@@ -5,7 +5,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pytz import timezone
 
-from filters.users_filters import IsSellerCallback
+from filters.users_filters import IsSellerCallback, IsSellerMessage
 from keyboards.default.menu import menu_keyboard
 from keyboards.inline.callback_datas import confirm_order_seller_data, couriers_data, active_order_data, \
     order_is_delivered, confirm_bonus_order, active_bonus_order_data, bonus_order_is_delivered_data
@@ -15,6 +15,20 @@ from loader import dp, db, bot
 from states.sellers_states import SelectCourier
 from utils.send_messages import send_message_to_courier_order, \
     send_confirm_message_to_user_pickup, send_confirm_message_to_user_delivery
+
+
+@dp.message_handler(IsSellerMessage(), commands=['im_at_work'], state=['*'])
+async def im_at_work(message: types.Message):
+    """Ставим статус на работе"""
+    await db.im_at_work_seller(message.from_user.id, 'true')
+    await message.answer('Теперь Вы будете получать заказы')
+
+
+@dp.message_handler(IsSellerMessage(), commands=['im_at_home'], state=['*'])
+async def im_at_home(message: types.Message):
+    """Ставим статус дома"""
+    await db.im_at_work_seller(message.from_user.id, 'false')
+    await message.answer('Теперь Вы не будете получать заказы')
 
 
 @dp.callback_query_handler(confirm_order_seller_data.filter(status='confirm'), state=['*'])
@@ -92,7 +106,7 @@ async def get_reason(message: types.Message, state: FSMContext):
     await state.finish()
 
 
-@dp.message_handler(commands=['active_orders'], state=["*"])
+@dp.message_handler(IsSellerMessage(), commands=['active_orders'], state=["*"])
 async def get_active_orders(message: types.Message):
     """Показать список всех принятых заказов"""
     location_id = await db.get_seller_location_id(message.from_user.id)
@@ -160,7 +174,7 @@ async def order_ready(call: CallbackQuery, callback_data: dict):
 
 
 # Список заказов, ожидающих принятия
-@dp.message_handler(commands=['unaccepted_orders'], state=["*"])
+@dp.message_handler(IsSellerMessage(), commands=['unaccepted_orders'], state=["*"])
 async def get_active_orders(message: types.Message):
     """Показать список всех непринятых заказов"""
     location_id = await db.get_seller_location_id(message.from_user.id)
@@ -217,7 +231,7 @@ async def get_active_orders(message: types.Message):
 
 # список заказов, с кнопкой подтверждения о выдаче заказа на кассе
 
-@dp.message_handler(commands=['confirm_delivery'], state=['*'])
+@dp.message_handler(IsSellerMessage(), commands=['confirm_delivery'], state=['*'])
 async def confirm_delivery_seller(message: types.Message):
     """Подтверждение выдачи товара продавцом"""
     location_id = await db.get_seller_location_id(message.from_user.id)
@@ -289,7 +303,7 @@ async def confirm_bonus_order_seller(call: CallbackQuery, callback_data: dict):
         await call.message.answer('Заказ уже обработан')
 
 
-@dp.message_handler(commands=['confirm_readiness_bonus_orders'], state=['*'])
+@dp.message_handler(IsSellerMessage(), commands=['confirm_readiness_bonus_orders'], state=['*'])
 async def set_ready_bonus_orders(message: types.Message):
     """Получаем список ативных бонусных заказов"""
     location_id = await db.get_seller_location_id(message.from_user.id)
@@ -316,7 +330,7 @@ async def confirm_readiness_bonus(call: CallbackQuery, callback_data: dict):
         "Уведомление клиенту отправлено! После выдачи заказа отметьте его в /confirm_bonus_orders")
 
 
-@dp.message_handler(commands=['confirm_bonus_orders'], state=['*'])
+@dp.message_handler(IsSellerMessage(), commands=['confirm_bonus_orders'], state=['*'])
 async def bonus_orders_to_confirm_delivery(message: types.Message):
     """Список бонусных заказов к выдаче"""
     location_id = await db.get_seller_location_id(message.from_user.id)

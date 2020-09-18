@@ -4,6 +4,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import CommandStart
 from aiogram.types import CallbackQuery, ContentTypes
 
+from filters.users_filters import HasNoMetro, HasNoLocation, HasNoLocalObject, IsNotClientMessage
 from keyboards.default.menu import menu_keyboard
 from keyboards.inline.callback_datas import metro_data, local_object_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_metro, get_available_local_objects
@@ -42,6 +43,9 @@ async def bot_start_referal(message: types.Message, state: FSMContext):
             await SignUpUser.Metro.set()
 
 
+@dp.message_handler(HasNoMetro(), IsNotClientMessage(), state=['*'])
+@dp.message_handler(HasNoLocation(), IsNotClientMessage(), state=['*'])
+@dp.message_handler(HasNoLocalObject(), IsNotClientMessage(), state=['*'])
 @dp.message_handler(CommandStart(deep_link=None), state=['*'])
 async def bot_start(message: types.Message):
     """Нажатие на старт без реферального кода"""
@@ -109,13 +113,3 @@ async def set_user_location(call: CallbackQuery, callback_data: dict, state: FSM
                               f'http://t.me/{bot_user.username}?start={call.from_user.id}\n'
                               f'Подробнее о реферальной системе можно узнать в разделе "Акции и бонусы".',
                               reply_markup=menu_keyboard)
-
-
-@dp.message_handler(state='*', content_types=ContentTypes.PHOTO)
-async def get_product_photo(message: types.Message, state: FSMContext):
-    """Получаем фотографию товара"""
-    photo_id = message.photo[-1].file_id
-    await message.answer(photo_id)
-
-# @dp.callback_query_handler(state=SignUpUser.Location)
-# async def

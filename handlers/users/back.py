@@ -56,7 +56,7 @@ async def back_to_product(call: CallbackQuery, callback_data: dict, state: FSMCo
 
 
 @dp.callback_query_handler(back_to_product_list_data.filter(), state=[Menu.WaitProductSize,
-                                                                                 Menu.WaitProductSizeBack])
+                                                                      Menu.WaitProductSizeBack])
 async def back_to_product_from_sizes_list(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Назад к выбору товара из меню выбора размера"""
     print('Поймал')

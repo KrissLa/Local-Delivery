@@ -11,6 +11,16 @@ async def get_temp_orders_list_message(orders):
     return mes
 
 
+async def get_objects_list_message(objects):
+    """Формируем список объектов доставки"""
+    mes = ''
+    num = 1
+    for ob in objects:
+        mes += f'{num}. Москва, {ob["local_object_name"]}\n'
+        num += 1
+    return mes
+
+
 async def get_final_price(orders):
     """Считаем окончательную цену"""
     fin_price = 0
@@ -177,11 +187,11 @@ telegramID - {sa['admin_seller_telegram_id']}
     return mes
 
 
-async def get_list_of_sellers(seller_admins_list):
+async def get_list_of_sellers(sellers_list):
     """Формируем список продавцов локаций для удаления"""
     mes = ''
 
-    for sa in seller_admins_list:
+    for sa in sellers_list:
         if sa['seller_location_id']:
             location_name = await db.get_location_name_by_id(sa['seller_location_id'])
         else:
@@ -190,6 +200,30 @@ async def get_list_of_sellers(seller_admins_list):
 telegramID - {sa['seller_telegram_id']}
 Локация: {location_name}
 Чтобы удалить, нажмите /remove_seller_by_id_{sa['seller_id']}\n\n"""
+        mes += seller
+    return mes
+
+
+async def get_list_of_sellers_location(sellers_list):
+    """Формируем список продавцов локаций для удаления"""
+    mes = ''
+
+    for sa in sellers_list:
+        seller = f"""{sa['seller_id']}. {sa['seller_name']}
+telegramID - {sa['seller_telegram_id']}
+Чтобы удалить, нажмите /remove_seller_{sa['seller_id']}\n\n"""
+        mes += seller
+    return mes
+
+
+async def get_list_of_couriers_location(courier_list):
+    """Формируем список курьеров локаций для удаления"""
+    mes = ''
+
+    for sa in courier_list:
+        seller = f"""{sa['courier_id']}. {sa['courier_name']}
+telegramID - {sa['courier_telegram_id']}
+Чтобы удалить, нажмите /remove_courier_{sa['courier_id']}\n\n"""
         mes += seller
     return mes
 

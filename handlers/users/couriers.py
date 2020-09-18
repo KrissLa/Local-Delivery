@@ -2,12 +2,26 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
-from filters.users_filters import IsCourierCallback
+from filters.users_filters import IsCourierCallback, IsCourierMessage
 from keyboards.inline.callback_datas import order_is_delivered
 from loader import dp, db, bot
 
 
-@dp.message_handler(commands=['all_ready_orders'], state=["*"])
+@dp.message_handler(IsCourierMessage(), commands=['im_at_work'], state=['*'])
+async def im_at_work(message: types.Message):
+    """Ставим статус на работе"""
+    await db.im_at_work_courier(message.from_user.id, 'true')
+    await message.answer('Теперь Вы будете получать заказы')
+
+
+@dp.message_handler(IsCourierMessage(), commands=['im_at_home'], state=['*'])
+async def im_at_home(message: types.Message):
+    """Ставим статус дома"""
+    await db.im_at_work_courier(message.from_user.id, 'false')
+    await message.answer('Теперь Вы не будете получать заказы')
+
+
+@dp.message_handler(IsCourierMessage(), commands=['all_ready_orders'], state=["*"])
 async def get_active_orders(message: types.Message, state: FSMContext):
     """Показать список всех заказов, готовых к доставке"""
     await state.finish()
@@ -33,7 +47,7 @@ async def get_active_orders(message: types.Message, state: FSMContext):
         await message.answer('Нет готовых к доставке заказов.')
 
 
-@dp.message_handler(commands=['my_orders'], state=['*'])
+@dp.message_handler(IsCourierMessage(), commands=['my_orders'], state=['*'])
 async def get_my_orders(message: types.Message, state: FSMContext):
     """Список заказов закрепленных за курьером"""
     await state.finish()
