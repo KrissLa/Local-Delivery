@@ -69,7 +69,6 @@ async def remove_sellers(message: types.Message, state: FSMContext):
     await message.answer('Внимание!\n'
                          'Удаление происходит сразу после нажатия на команду')
     sellers_list = await db.get_sellers_list_by_location(location_id)
-    print(sellers_list)
     if sellers_list:
         list_message = await get_list_of_sellers_location(sellers_list)
         await message.answer(list_message,
@@ -191,7 +190,6 @@ async def remove_category_from_stock(message: types.Message, state: FSMContext):
     location_id = await db.get_location_for_seller_admin(message.from_user.id)
     await state.update_data(location_id=location_id)
     category_list = await db.get_categories_in_stock_by_location(location_id, status='true')
-    print(category_list)
     if category_list:
         list_message = await get_list_of_category_for_remove_from_stock(category_list)
         await message.answer(list_message,
@@ -212,7 +210,7 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
         category_id = int(message.text.split('_')[-1])
         await db.remove_from_stock_category_in_location(category_id, location_id)
         await message.answer('Категория снята с продажи\n'
-                             ' Чтобы снять еще одну, снова введите /remove_category_from_stock\n'
+                             'Чтобы снять еще одну, снова введите /remove_category_from_stock\n'
                              'Чтобы вернуть в продажу, введите /return_category_to_stock')
         await state.finish()
     except:
@@ -246,7 +244,7 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
         category_id = int(message.text.split('_')[-1])
         await db.return_from_stock_category_in_location(category_id, location_id)
         await message.answer('Категория возвращена в  продажу\n'
-                             ' Чтобы вернуть еще одну, снова введите /return_category_to_stock\n'
+                             'Чтобы вернуть еще одну, снова введите /return_category_to_stock\n'
                              'Чтобы убрать из продажи, введите /remove_category_from_stock')
         await state.finish()
     except:
@@ -297,7 +295,7 @@ async def remove_item_from_stock_by_id(message: types.Message, state: FSMContext
         product_id = int(message.text.split('_')[-1])
         await db.remove_from_stock_product_in_location(product_id, location_id)
         await message.answer('Товар снят с продажи\n'
-                             ' Чтобы снять еще один, снова введите /remove_item_from_stock\n'
+                             'Чтобы снять еще один, снова введите /remove_item_from_stock\n'
                              'Чтобы вернуть в продажу, введите /return_item_to_stock')
         await state.finish()
     except:
@@ -348,7 +346,7 @@ async def return_item_to_stock_by_id(message: types.Message, state: FSMContext):
         location_id = data.get('location_id')
         await db.return_to_stock_product_in_location(product_id, location_id)
         await message.answer('Товар возвращен в продажу\n'
-                             ' Чтобы вернуть еще один, снова введите /return_item_to_stock\n'
+                             'Чтобы вернуть еще один, снова введите /return_item_to_stock\n'
                              'Чтобы убрать из продажи, введите /remove_item_from_stock')
         await state.finish()
     except:

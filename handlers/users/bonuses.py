@@ -12,22 +12,21 @@ from utils.send_messages import send_message_to_sellers_bonus
 @dp.message_handler(text="Акции и бонусы")
 async def send_categories_menu(message: types.Message):
     """Нажатие на кнопку акции и бонусы"""
-    bonus = await db.get_count_bonuses(message.from_user.id)
-    location_address = await db.get_location_address_by_user(message.from_user.id)
+    data = await db.get_bonus_and_location_address(message.from_user.id)
     bot_user = await dp.bot.get_me()
-    if bonus == 0:
+    if data['bonus'] == 0:
         await message.answer("Ваш бонусный баланс:\n"
-                             f"Любой гриль ролл из ассортимента - {bonus} шт.\n")
+                             f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n")
     else:
         await message.answer("Ваш бонусный баланс:\n"
-                             f"Любой гриль ролл из ассортимента - {bonus} шт.\n"
+                             f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n"
                              f"Подойдите к продавцу и нажмите Получить\n"
-                             f"Ближайтей адрес: {location_address}",
+                             f"Ближайтей адрес: {data['location_address']}",
                              reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                  [
                                      InlineKeyboardButton(
                                          text='Получить',
-                                         callback_data=bonuses_data.new(count_bonus=bonus)
+                                         callback_data=bonuses_data.new(count_bonus=data['bonus'])
                                      )
                                  ]
                              ]))
@@ -60,22 +59,21 @@ async def back_to_bonus(call: CallbackQuery, state: FSMContext):
     """Назад к бонусу"""
     await call.answer('Назад')
     await call.message.edit_reply_markup()
-    bonus = await db.get_count_bonuses(call.from_user.id)
-    location_address = await db.get_location_address_by_user(call.from_user.id)
+    data = await db.get_bonus_and_location_address(call.from_user.id)
     bot_user = await dp.bot.get_me()
-    if bonus == 0:
+    if data['bonus'] == 0:
         await call.message.answer("Ваш бонусный баланс:\n"
-                                  f"Любой гриль ролл из ассортимента - {bonus} шт.\n")
+                                  f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n")
     else:
         await call.message.answer("Ваш бонусный баланс:\n"
-                                  f"Любой гриль ролл из ассортимента - {bonus} шт.\n"
+                                  f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n"
                                   f"Подойдите к продавцу и нажмите Получить\n"
-                                  f"Ближайтей адрес: {location_address}",
+                                  f"Ближайтей адрес: {data['location_address']}",
                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                       [
                                           InlineKeyboardButton(
                                               text='Получить',
-                                              callback_data=bonuses_data.new(count_bonus=bonus)
+                                              callback_data=bonuses_data.new(count_bonus=data['bonus'])
                                           )
                                       ]
                                   ]))

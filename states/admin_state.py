@@ -3,6 +3,10 @@ from aiogram.dispatcher.filters.state import StatesGroup, State
 
 class AddAdmin(StatesGroup):
     """Стейты для бонусного заказа"""
+    BanID = State()
+    UnBanID = State()
+    BanReason = State()
+
     PromoPhoto = State()
     PromoCaption = State()
     PromoConfirm = State()

@@ -59,7 +59,6 @@ async def back_to_product(call: CallbackQuery, callback_data: dict, state: FSMCo
                                                                       Menu.WaitProductSizeBack])
 async def back_to_product_from_sizes_list(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Назад к выбору товара из меню выбора размера"""
-    print('Поймал')
     if await state.get_state() == 'Menu:WaitProductSizeBack':
         await db.delete_from_cart(call.from_user.id)
     await call.answer(cache_time=10)
@@ -83,7 +82,6 @@ async def back_to_size(call: CallbackQuery, callback_data: dict, state: FSMConte
     await call.message.edit_reply_markup()
     product_id = int(callback_data.get('product_id'))
     product_info = await db.get_product_info_by_id(product_id, call.from_user.id)
-    print(product_info['product_info']['product_category_id'])
     await bot.send_photo(chat_id=call.from_user.id,
                          photo=product_info['product_info']['product_photo_id'],
                          caption=product_info['product_info']['product_description'])
@@ -102,7 +100,6 @@ async def back_to_quantity(call: CallbackQuery, state: FSMContext):
     """Назад к выбору количества"""
     await call.message.edit_reply_markup()
     product_data = await db.get_last_temp_order_id(call.from_user.id)
-    print(product_data)
     product_id = product_data['product_id']
     order_id = product_data['temp_order_id']
     size_id = product_data['size_id']

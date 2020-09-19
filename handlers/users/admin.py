@@ -21,6 +21,69 @@ from utils.temp_orders_list import get_list_of_location_message, get_list_of_loc
     get_list_of_products_for_edit, get_sizes_for_remove, get_sizes_for_edit
 
 
+@dp.message_handler(IsAdminMessage(), commands=['ban_user'])
+async def ban_user(message: types.Message):
+    """Забанить пользователя"""
+    await message.answer('Введите telegramID пользователя',
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.BanID.set()
+
+
+@dp.message_handler(state=AddAdmin.BanID)
+async def get_ban_id(message: types.Message, state: FSMContext):
+    """Получаем id"""
+    try:
+        ban_id = int(message.text)
+        await state.update_data(ban_id=ban_id)
+        await message.answer(f'id - {ban_id}\n'
+                             f'Теперь введите причину бана.',
+                             reply_markup=cancel_admin_markup)
+        await AddAdmin.BanReason.set()
+    except:
+        await message.answer('Не получилось, попробуйте еще раз',
+                             reply_markup=cancel_admin_markup)
+        await AddAdmin.BanID.set()
+
+
+@dp.message_handler(state=AddAdmin.BanReason)
+async def get_ban_reason(message: types.Message, state: FSMContext):
+    """Получаем причину бана"""
+    reason = message.text
+    data = await state.get_data()
+    ban_id = data.get('ban_id')
+    try:
+        await db.ban_user(ban_id, reason)
+        await message.answer('Пользователь забанен.')
+    except:
+        await message.answer('Не получилось. Попробуйте вручную через базу данных.')
+    await state.finish()
+
+
+@dp.message_handler(IsAdminMessage(), commands=['unban_user'])
+async def unban_user(message: types.Message):
+    """Разбан пользователя"""
+    await message.answer('Введите telegramID Пользователя',
+                             reply_markup=cancel_admin_markup)
+    await AddAdmin.UnBanID.set()
+
+
+@dp.message_handler(state=AddAdmin.UnBanID)
+async def get_unban_id(message: types.Message, state: FSMContext):
+    """Получаем id"""
+    try:
+        unban_id = int(message.text)
+        try:
+            await db.unban_user(unban_id)
+            await message.answer('Пользователь разбанен')
+        except:
+            await message.answer("Не получилось, попробуйте вручную через базу данных")
+        await state.finish()
+    except:
+        await message.answer("Попробуйте ввести еще раз.",
+                             reply_markup=cancel_admin_markup)
+        await AddAdmin.UnBanID.set()
+
+
 @dp.message_handler(IsAdminMessage(), commands=['publish_post'])
 async def publish_post(message: types.Message):
     """Создаем промо пост"""
@@ -76,6 +139,7 @@ async def send_publish_post(message: types.Message, state: FSMContext):
                          f'Успешно - {count} сообщений.\n'
                          f'Ошибок - {count_error}.')
     await state.finish()
+
 
 @dp.message_handler(IsAdminMessage(), commands=['set_about'])
 async def set_about(message: types.Message):
@@ -269,7 +333,6 @@ async def save_newlocation(call: CallbackQuery, state: FSMContext):
     await call.message.edit_reply_markup()
     data = await state.get_data()
     new_location = data.get('new_location')
-    print(new_location)
     await db.add_location(new_location)
     await call.message.answer('Новая локация добавлена. Чтобы добавить объект локальной доставки '
                               'введите /add_local_object')
@@ -388,7 +451,6 @@ async def delete_local_object(message: types.Message):
     await message.answer('Внимание!\n'
                          'Удаление происходит сразу после нажатия на команду')
     local_objects_list = await db.get_local_objects_list()
-    print(local_objects_list)
     if local_objects_list:
         list_message = await get_list_of_local_objects(local_objects_list)
         await message.answer(list_message,
@@ -454,7 +516,6 @@ async def remove_category(message: types.Message):
                          'Удаление происходит сразу после нажатия на команду\n'
                          'Вместе с категорией удаляются все товары в ней')
     category_list = await db.get_category_list()
-    print(category_list)
     if category_list:
         list_message = await get_list_of_category(category_list)
         await message.answer(list_message,
@@ -485,11 +546,10 @@ async def add_item(message: types.Message):
     categories = await db.get_list_of_categories()
     if categories:
         await message.answer("Выберите категорию",
-                         reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
+                             reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
         await AddAdmin.ItemCategory.set()
     else:
         await message.answer("Пока нет категорий. Чтобы добавить нажмите /add_category")
-
 
 
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.ItemCategory)
@@ -738,7 +798,6 @@ async def save_item_without_size(call: CallbackQuery, state: FSMContext):
     # await call.message.edit_reply_markup()
     data = await state.get_data()
     new_item = data.get('new_item')
-    print(new_item['prices']['price1'])
     await db.add_product(new_item)
     await bot.send_photo(call.from_user.id,
                          photo=new_item['photo_id'],
@@ -899,7 +958,6 @@ async def remove_seller_admin(message: types.Message):
     await message.answer('Внимание!\n'
                          'Удаление происходит сразу после нажатия на команду\n')
     sellers_list = await db.get_seller_admins_list()
-    print(sellers_list)
     if sellers_list:
         list_message = await get_list_of_seller_admins(sellers_list)
         await message.answer(list_message,
@@ -1031,7 +1089,6 @@ async def remove_seller(message: types.Message):
     await message.answer('Внимание!\n'
                          'Удаление происходит сразу после нажатия на команду\n')
     sellers_list = await db.get_seller_list()
-    print(sellers_list)
     if sellers_list:
         list_message = await get_list_of_sellers(sellers_list)
         await message.answer(list_message,
@@ -1163,7 +1220,6 @@ async def remove_courier(message: types.Message):
     await message.answer('Внимание!\n'
                          'Удаление происходит сразу после нажатия на команду\n')
     couriers_list = await db.get_courier_list()
-    print(couriers_list)
     if couriers_list:
         list_message = await get_list_of_couriers(couriers_list)
         await message.answer(list_message,
@@ -1194,7 +1250,6 @@ async def reset_seller_admin_location(message: types.Message):
     await message.answer('Внимание!\n'
                          'Сбрасывание локации происходит сразу после нажатия на команду\n')
     sellers_list = await db.get_seller_admins_list()
-    print(sellers_list)
     if sellers_list:
         list_message = await get_list_of_seller_admins_for_reset(sellers_list)
         await message.answer(list_message,
@@ -1226,7 +1281,6 @@ async def reset_seller_location(message: types.Message):
     await message.answer('Внимание!\n'
                          'Сбрасывание локации происходит сразу после нажатия на команду\n')
     sellers_list = await db.get_seller_list()
-    print(sellers_list)
     if sellers_list:
         list_message = await get_list_of_sellers_for_reset(sellers_list)
         await message.answer(list_message,
@@ -1258,7 +1312,6 @@ async def reset_courier_location(message: types.Message):
     await message.answer('Внимание!\n'
                          'Сбрасывание локации происходит сразу после нажатия на команду\n')
     courier_list = await db.get_courier_list()
-    print(courier_list)
     if courier_list:
         list_message = await get_list_of_couriers_for_reset(courier_list)
         await message.answer(list_message,
@@ -1288,7 +1341,6 @@ async def reset_courier_by_id(message: types.Message, state: FSMContext):
 async def remove_category_from_stock(message: types.Message):
     """Временно снимаем категорию с продажи"""
     category_list = await db.get_category_for_admin_true()
-    print(category_list)
     if category_list:
         list_message = await get_list_of_category_for_remove_from_stock(category_list)
         await message.answer(list_message,
@@ -1320,7 +1372,6 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
 async def return_category_to_stock(message: types.Message):
     """Возвращаем категорию в продажу"""
     category_list = await db.get_category_for_admin_false()
-    print(category_list)
     if category_list:
         list_message = await get_list_of_category_for_return_to_stock(category_list)
         await message.answer(list_message,
@@ -1352,7 +1403,6 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
 async def remove_item_from_stock(message: types.Message):
     """Убираем товар из продажу"""
     category_list = await db.get_category_for_remove_item_from_stock()
-    print(category_list)
     if category_list:
         await message.answer('Выберите категорию, из которой нужно убрать товар.',
                              reply_markup=await generate_keyboard_with_categories_for_add_item(category_list))
@@ -1368,9 +1418,7 @@ async def get_category_for_remove_item_from_stock(call: CallbackQuery, callback_
     """Получаем категорию из которой будем убирать товар"""
     await call.message.edit_reply_markup()
     category_id = int(callback_data.get('category_id'))
-    print(category_id)
     products = await db.get_products_for_remove_from_stock(category_id)
-    print(products)
     if products:
         list_of_products = await get_list_of_products_for_remove_from_stock(products)
         await call.message.answer(list_of_products,
@@ -1401,7 +1449,6 @@ async def remove_item_from_stock_by_id(message: types.Message, state: FSMContext
 async def return_item_to_stock(message: types.Message):
     """Возвращаем товар в продажу"""
     category_list = await db.get_category_for_admin()
-    print(category_list)
     if category_list:
         await message.answer('Выберите категорию, в которой нужно вернуть товар.',
                              reply_markup=await generate_keyboard_with_categories_for_add_item(category_list))
@@ -1417,9 +1464,7 @@ async def get_category_for_return_item_to_stock(call: CallbackQuery, callback_da
     """Получаем категорию, в которую будем возвращать товар"""
     await call.message.edit_reply_markup()
     category_id = int(callback_data.get('category_id'))
-    print(category_id)
     products = await db.get_products_for_return_to_stock(category_id)
-    print(products)
     if products:
         list_of_products = await get_list_of_products_for_return_to_stock(products)
         await call.message.answer(list_of_products,
@@ -1451,7 +1496,6 @@ async def change_seller_admin_location(message: types.Message):
     """Меняем локацию у админа локации"""
     await message.answer('Снчала выберите админа локации')
     sellers_list = await db.get_seller_admins_list()
-    print(sellers_list)
     if sellers_list:
         list_message = await get_list_of_seller_admins_for_change(sellers_list)
         await message.answer(list_message,
@@ -1510,7 +1554,6 @@ async def change_seller_location(message: types.Message):
     """Меняем локацию у продавца"""
     await message.answer('Снчала выберите продавца')
     sellers_list = await db.get_seller_list()
-    print(sellers_list)
     if sellers_list:
         list_message = await get_list_of_sellers_for_change(sellers_list)
         await message.answer(list_message,
@@ -1569,7 +1612,6 @@ async def change_courier_location(message: types.Message):
     """Меняем локацию у courier"""
     await message.answer('Снчала выберите курьера')
     courier_list = await db.get_courier_list()
-    print(courier_list)
     if courier_list:
         list_message = await get_list_of_couriers_for_change(courier_list)
         await message.answer(list_message,
@@ -2416,9 +2458,6 @@ async def get_new_size_prices(message: types.Message, state: FSMContext):
         await AddAdmin.EditItemEditSizeByIdPrices.set()
 
 
-
-
-
 #############################################
 @dp.callback_query_handler(text='back', state=[AddAdmin.EditItemEditSizeByIdName,
                                                AddAdmin.EditItemEditSizeByIdPrices])
@@ -2619,7 +2658,10 @@ async def back_to_edit(call: CallbackQuery, state: FSMContext):
                                                  AddAdmin.SetAbout,
                                                  AddAdmin.PromoPhoto,
                                                  AddAdmin.PromoCaption,
-                                                 AddAdmin.PromoConfirm])
+                                                 AddAdmin.PromoConfirm,
+                                                 AddAdmin.BanReason,
+                                                 AddAdmin.BanID,
+                                                 AddAdmin.UnBanID])
 async def cancel_add_admin(call: CallbackQuery, state: FSMContext):
     """Кнопка отмены"""
     await call.message.edit_reply_markup()

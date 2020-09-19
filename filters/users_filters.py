@@ -92,3 +92,9 @@ class HasNoMetro(BoundFilter):
     async def check(self, message: types.Message):
         """Пользователи, у которых удалилась локация"""
         return not await db.has_metro(message.from_user.id)
+
+
+class IsBanned(BoundFilter):
+    async def check(self, message: types.Message):
+        """Забаненые пользователи"""
+        return await db.is_banned(message.from_user.id)

@@ -39,16 +39,21 @@ async def seller_confirms_order(call: CallbackQuery, callback_data: dict):
     order_taked = await db.take_order(order_id)
     if order_taked:
         time_user_location = await db.get_time_and_user_id(order_id)
-        print(time_user_location)
         delivery_to = datetime.now(timezone('Europe/Moscow')) + timedelta(minutes=time_user_location[0])
-        print(delivery_to.strftime("%H:%M"))
         await db.update_deliver_to(order_id, delivery_to)
         delivery_method = callback_data.get('delivery_method')
         if delivery_method == 'Заберу сам':
-            await send_confirm_message_to_user_pickup(time_user_location[1], order_id, delivery_to.strftime("%H:%M"))
-            await call.message.answer(f'Заказ № {order_id} подтвержден!\n'
-                                      f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
-                                      f'Не забудьте отметить готовность заказа. Найти его можно в /active_orders')
+            try:
+                await send_confirm_message_to_user_pickup(time_user_location[1], order_id,
+                                                          delivery_to.strftime("%H:%M"))
+                await call.message.answer(f'Заказ № {order_id} подтвержден!\n'
+                                          f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
+                                          f'Не забудьте отметить готовность заказа. Найти его можно в /active_orders')
+            except:
+                await call.message.answer(f'Не удалось отправить подтверждение пользователю.'
+                                          f'Заказ № {order_id} подтвержден!\n'
+                                          f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
+                                          f'Не забудьте отметить готовность заказа. Найти его можно в /active_orders')
         else:
             couriers = await db.get_couriers_for_location(time_user_location[2])
             if couriers:
@@ -72,9 +77,14 @@ async def select_courier(call: CallbackQuery, callback_data: dict, state: FSMCon
     await db.update_order_courier(order_id, courier_name, courier_tg_id)
     order_info = await db.get_order_info_for_courier(order_id)
     await send_message_to_courier_order(courier_tg_id, order_info)
-    await send_confirm_message_to_user_delivery(order_info, courier_name)
-    await call.message.answer("Уведомления курьеру и клиенту отправлены."
-                              'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
+    try:
+        await send_confirm_message_to_user_delivery(order_info, courier_name)
+        await call.message.answer("Уведомления курьеру и клиенту отправлены."
+                                  'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
+    except:
+        await call.message.answer("Не удалось отправить уведомление пользователю"
+                                  "Уведомления курьеру отправлено."
+                                  'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
     await state.finish()
 
 

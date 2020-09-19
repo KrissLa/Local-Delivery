@@ -17,8 +17,8 @@ async def cart(message: types.Message, state: FSMContext):
         final_price = await get_final_price(temp_orders)
         await state.update_data(list_products=list_products)
         await state.update_data(final_price=final_price)
-        await message.answer(text=f'Вы выбрали:\n{list_products}')
-        await message.answer(f'Сумма заказа - {final_price} руб.',
+        await message.answer(f'Вы выбрали:\n{list_products}\n'
+                             f'Сумма заказа - {final_price} руб.',
                              reply_markup=one_more_product_markup)
         await message.answer(text='Оформить заказ\n'
                                   'i Доставка работает в будни с 11 до 17',

@@ -53,6 +53,8 @@ async def bot_help(message: types.Message):
         '/change_courier_location - Привязать курьера к другой локации',
         '/edit_metro - Редактировать метро',
         '/edit_item - Редактировать товар',
+        '/ban_user - Заблокировать пользователя',
+        '/unban_user - Разблокировать пользователя',
     ]
     await message.answer('\n'.join(text))
 

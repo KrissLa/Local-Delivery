@@ -39,7 +39,8 @@ async def get_active_orders(message: types.Message, state: FSMContext):
                                          InlineKeyboardButton(
                                              text='Заказ доставлен!',
                                              callback_data=order_is_delivered.new(order_id=order["order_id"],
-                                                                                  user_id=order['order_user_telegram_id'])
+                                                                                  user_id=order[
+                                                                                      'order_user_telegram_id'])
                                          )
                                      ]
                                  ]))
@@ -72,9 +73,13 @@ async def confirm_delivery_courier(call: CallbackQuery, callback_data: dict):
     order_id = int(callback_data.get('order_id'))
     user_id = int(callback_data.get('user_id'))
     if await db.order_is_delivered(order_id, user_id):
-        await call.message.answer(f'Заказ № {order_id} доставлен!')
-        await bot.send_message(user_id,
-                               f'Ваш заказ № {order_id} доставлен.\n'
-                               f'Приятного аппетита!')
+        try:
+            await bot.send_message(user_id,
+                                   f'Ваш заказ № {order_id} доставлен.\n'
+                                   f'Приятного аппетита!')
+            await call.message.answer(f'Заказ № {order_id} доставлен!')
+        except:
+            await call.message.answer(f'Не удалось отправить уведомление пользователю.\n'
+                                      f'Заказ отмечен как доставлен.')
     else:
         await call.message.answer('Заказ уже отмечен как доставлен.')

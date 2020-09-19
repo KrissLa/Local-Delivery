@@ -217,6 +217,8 @@ class Database:
            number_of_referrals INT NOT NULL DEFAULT 0,
            number_of_referral_orders INT NOT NULL DEFAULT 0,
            bonus INT NOT NULL DEFAULT 0,
+           is_banned BOOLEAN NOT NULL DEFAULT false,
+           reason_for_ban TEXT,
            FOREIGN KEY (user_metro_id) REFERENCES metro (metro_id) ON DELETE SET NULL,
            FOREIGN KEY (user_location_id) REFERENCES locations (location_id) ON DELETE SET NULL,
            FOREIGN KEY (user_local_object_id) REFERENCES local_objects (local_object_id) ON DELETE SET NULL
@@ -300,7 +302,12 @@ class Database:
     async def get_available_metro(self):
         """Получаем список доступных станций метро"""
         return await self.pool.fetch(
-            "SELECT metro_id, metro_name  FROM metro where is_metro_available = TRUE ORDER BY metro_id")
+            """SELECT DISTINCT metro_id, metro_name  
+FROM metro 
+JOIN locations ON location_metro_id = metro_id
+JOIN local_objects ON local_object_location_id = location_id
+where is_metro_available = TRUE 
+AND is_local_object_available = true ORDER BY metro_id""")
 
     async def get_metro_name_by_metro_id(self, metro_id):
         """Получаем название станции метро по его id"""
@@ -319,7 +326,8 @@ class Database:
     async def get_available_local_objects(self, metro_id):
         """Получаем список доступных объектов доставки около заданной станции метро"""
         return await self.pool.fetch(
-            f"SELECT local_object_id, local_object_name  FROM local_objects where local_object_metro_id = {metro_id} AND is_local_object_available = TRUE")
+            f"SELECT local_object_id, local_object_name  FROM local_objects "
+            f"where local_object_metro_id = {metro_id} AND is_local_object_available = TRUE")
 
     async def get_location_data_by_id(self, location_id):
         """Получаем информацию о локации по id"""
@@ -410,11 +418,15 @@ class Database:
     async def get_categories_for_user_location_id(self, user_id):
         """Получаем список доступных категорий в локации пользователя"""
         sql = f"""
-        SELECT categories.category_name, categories.category_id
-        FROM locations_categories JOIN categories ON locations_categories.lc_category_id=categories.category_id
+        SELECT DISTINCT categories.category_name, categories.category_id
+        FROM locations_categories 
+		JOIN categories ON locations_categories.lc_category_id=categories.category_id
+		JOIN products ON product_category_id=category_id
         WHERE locations_categories.lc_location_id=
         (SELECT user_location_id FROM users WHERE user_telegram_id = {user_id})
-        AND locations_categories.is_category_in_location_available = true AND categories.is_category_available = true
+        AND locations_categories.is_category_in_location_available = true 
+		AND categories.is_category_available = true
+		AND is_product_available = true
         ORDER BY category_id;
         """
         return await self.pool.fetch(sql)
@@ -423,11 +435,13 @@ class Database:
         """Получаем список доступных товаров в локации пользователя"""
         sql = f"""
         SELECT products.product_name, products.product_id
-        FROM locations_products JOIN products ON locations_products.lp_product_id=products.product_id
+        FROM locations_products 
+        JOIN products ON locations_products.lp_product_id=products.product_id
         WHERE products.product_category_id = {category_id}
 		AND locations_products.lp_location_id=
         (SELECT user_location_id FROM users WHERE user_telegram_id = {user_id})
-        AND locations_products.is_product_in_location_available = true AND products.is_product_available = true
+        AND locations_products.is_product_in_location_available = true 
+        AND products.is_product_available = true
 		ORDER BY product_id;
         """
         return await self.pool.fetch(sql)
@@ -580,6 +594,26 @@ class Database:
             except asyncpg.exceptions.UniqueViolationError:
                 count += 1
 
+    async def get_user_address_data(self, user_id):
+        """Получаем инфу о пользователе для создания заказа"""
+        return await self.pool.fetchrow(
+            f"""SELECT user_metro_id, user_location_id, user_local_object_id, user_address, location_address, 
+                local_object_name
+                FROM users 
+                JOIN locations ON user_location_id=location_id
+                JOIN local_objects ON local_object_id=user_local_object_id
+                WHERE user_telegram_id = {user_id};"""
+        )
+
+    async def get_user_address_data_without_location_address(self, user_id):
+        """Получаем инфу о пользователе для создания заказа"""
+        return await self.pool.fetchrow(
+            f"""SELECT user_metro_id, user_location_id, user_local_object_id, user_address, local_object_name
+                FROM users 
+                JOIN local_objects ON local_object_id=user_local_object_id
+                WHERE user_telegram_id = {user_id};"""
+        )
+
     async def get_user_adress_info(self, user_id):
         """Получаем инфу о пользователе для создания заказа"""
         return await self.pool.fetchrow(
@@ -656,10 +690,17 @@ class Database:
             f'UPDATE orders SET order_created_at = now() WHERE order_id = {order_id}'
         )
 
+    async def update_order_status_and_created_at(self, order_id, status):
+        """Обновляем статус и время создания заказа"""
+        await self.pool.execute(
+            f"""UPDATE orders SET order_status = '{status}', order_created_at = now() WHERE order_id = {order_id}"""
+        )
+
     async def get_size_info(self, size_id):
         """Получаем информацию о размере"""
         return await self.pool.fetchrow(
-            f'SELECT size_name, size_product_id, price_1, price_2, price_3, price_4, price_5, price_6 from product_sizes where size_id = {size_id}'
+            f'SELECT size_name, size_product_id, price_1, price_2, price_3, price_4, price_5, price_6 '
+            f'from product_sizes where size_id = {size_id}'
         )
 
     async def get_product_name(self, product_id):
@@ -998,6 +1039,15 @@ WHERE order_id = {order_id}"""
         )
         return await self.pool.fetchval(
             f'SELECT location_address FROM locations WHERE location_id = {location_id}'
+        )
+
+    async def get_bonus_and_location_address(self, user_id):
+        """Получаем количество бонусов и адес локации"""
+        return await self.pool.fetchrow(
+            f"""SELECT bonus, location_address
+                FROM users 
+                JOIN locations ON user_location_id=location_id
+                WHERE user_telegram_id = {user_id};"""
         )
 
     async def get_user_location_id(self, user_id):
@@ -2088,4 +2138,30 @@ ORDER BY order_id"""
         """Получаем список пользователей"""
         return await self.pool.fetch(
             f"""SELECT user_telegram_id FROM users"""
+        )
+
+    async def is_banned(self, user_id):
+        """Проверяем забанен ли"""
+        return await self.pool.fetchval(
+            f"""SELECT is_banned FROM users WHERE user_telegram_id={user_id}"""
+        )
+
+    async def get_reason_for_ban(self, user_id):
+        """Проверяем забанен ли"""
+        return await self.pool.fetchval(
+            f"""SELECT reason_for_ban FROM users WHERE user_telegram_id={user_id}"""
+        )
+
+    async def ban_user(self, user_id, reason):
+        """Блокируем пользователя"""
+        await self.pool.execute(
+            f"""UPDATE users SET is_banned=true, reason_for_ban='{reason}'
+                WHERE user_telegram_id={user_id}"""
+        )
+
+    async def unban_user(self, user_id):
+        """Разблокируем пользователя"""
+        await self.pool.execute(
+            f"""UPDATE users SET is_banned=false
+                WHERE user_telegram_id={user_id}"""
         )

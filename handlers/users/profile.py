@@ -104,7 +104,6 @@ async def get_user_location(call: CallbackQuery, callback_data: dict):
     await call.message.edit_reply_markup()
     await call.answer(cache_time=10)
     metro_id = int(callback_data.get('metro_id'))
-    print(metro_id)
     metro_name = await db.get_metro_name_by_metro_id(metro_id)
     await call.message.answer(f"Вы выбрали {metro_name} \n"
                               f"Выберите объект локальной доставки",
@@ -139,16 +138,16 @@ async def get_user_address(call: CallbackQuery, callback_data: dict, state: FSMC
 
 
 @dp.callback_query_handler(text='address_later', state=ProfileState.WaitAddress)
-async def set_change_profile_without_addres(call: CallbackQuery, state: FSMContext):
+async def set_change_profile_without_address(call: CallbackQuery, state: FSMContext):
     """Обновляем данные профиля без адреса"""
     data = await state.get_data()
     local_object_id = data.get('local_object_id')
     loc_data = await db.get_local_object_data_by_id(local_object_id)
     await db.update_user_info_without_address(call.from_user.id,
-                              loc_data['local_object_metro_id'],
-                              loc_data['local_object_location_id'],
-                              local_object_id
-                              )
+                                              loc_data['local_object_metro_id'],
+                                              loc_data['local_object_location_id'],
+                                              local_object_id
+                                              )
     await call.message.answer("Данные профиля обновлены.\n"
                               f"User ID: {call.from_user.id}\n"
                               f"Адрес доставки: {loc_data['local_object_name']}\n"

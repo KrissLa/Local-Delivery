@@ -2,9 +2,19 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 
-from filters.users_filters import IsAdminMessage
+from filters.users_filters import IsAdminMessage, IsBanned
 from keyboards.default.menu import menu_keyboard
 from loader import dp, db
+from utils.misc import rate_limit
+
+
+@rate_limit(25, 'help')
+@dp.message_handler(IsBanned(), state=['*'])
+async def ban(message: types.Message):
+    """Ответ забаненым"""
+    reason = await db.get_reason_for_ban(message.from_user.id)
+    await message.answer(f'Вы забанены\n'
+                         f'Причина: {reason}')
 
 
 @dp.message_handler(IsAdminMessage(), commands=['first_start'], state=['*'])
@@ -17,12 +27,12 @@ async def first_start(message: types.Message, state: FSMContext):
         ' чтобы бот не ругался на то, что Вы не закреплены за локацией',
         '/start - Начать диалог',
         '/help - Получить справку',
-        '/cart - Корзина',  # НЕ ГОТОВО
-        '/clear_cart - Очистить корзину',  # НЕ ГОТОВО
-        '/menu - Показать меню',  # НЕ ГОТОВО
-        '/order_status - Показать статус заказа',  # НЕ ГОТОВО
-        '/publish_post - Создать промо пост',  # НЕ ГОТОВО
-        '/set_about - Добавить/изменить описание компании',  # НЕ ГОТОВО
+        '/cart - Корзина',
+        '/clear_cart - Очистить корзину',
+        '/menu - Показать меню',
+        '/order_status - Показать статус заказа',
+        '/publish_post - Создать промо пост',
+        '/set_about - Добавить/изменить описание компании',
         '/add_admin - Добавть админа',
         '/delete_admin - Удалить админа',
         '/add_metro - Добавить станцию метро',
