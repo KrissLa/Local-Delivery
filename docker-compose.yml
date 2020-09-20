@@ -1,0 +1,48 @@
+version: '3.1'
+
+services:
+  db:
+    container_name: database
+    image: sameersbn/postgresql:10-2
+    env_file:
+      - ".env"
+    restart: always
+    ports:
+      - 5432:5432
+    networks:
+      - botnet
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+
+  tgbot:
+    container_name: bot
+    build:
+      context: .
+    command: python app.py
+    restart: always
+    env_file:
+      - ".env"
+    # bot start after load db
+    depends_on:
+      - db
+    networks:
+      - botnet
+  redis:
+    container_name: redis
+    image: redis
+    ports:
+      - 6379:6379
+    volumes:
+      - ../data/redis:/data
+    env_file:
+      - ".env"
+    entrypoint: redis-server --appendonly yes --requirepass $REDIS_PASS
+    networks:
+      - botnet
+
+    restart: always
+networks:
+  botnet:
+    # указывается драйвер сети
+    driver: bridge
+

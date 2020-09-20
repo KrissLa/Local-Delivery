@@ -1,6 +1,7 @@
-import asyncio
-import asyncpg
 from datetime import datetime
+
+import asyncpg
+from asyncpg.pool import Pool
 
 from data import config
 
@@ -8,17 +9,20 @@ now = datetime.now()
 
 
 class Database:
-    def __init__(self, loop: asyncio.AbstractEventLoop):
-        self.pool: asyncio.pool.Pool = loop.run_until_complete(
-            asyncpg.create_pool(
-                user=config.PGUSER,
-                database=config.PGDATABASE,
-                password=config.PGPASSWORD,
-                host=config.ip,
-                port=config.PORT,
-                statement_cache_size=0
-            )
+    def __init__(self, pool):
+        self.pool: Pool = pool
+
+    @classmethod
+    async def create(cls):
+        pool = await asyncpg.create_pool(
+            user=config.PGUSER,
+            database=config.PGDATABASE,
+            password=config.PGPASSWORD,
+            host="db",
+            port=config.PORT,
+            statement_cache_size=0
         )
+        return cls(pool)
 
     async def set_timezone(self):
         await self.pool.execute(
@@ -941,7 +945,7 @@ WHERE order_id = {order_id}"""
             num_orders = num_user_and_inviter_id['number_of_orders']
             try:
                 inviter_id = int(num_user_and_inviter_id['inviter_id'])
-            except:
+            except Exception as err:
                 inviter_id = None
             print(inviter_id)
             if inviter_id:
@@ -1263,7 +1267,7 @@ WHERE order_id = {order_id}"""
     async def is_seller_admin(self, user_id):
         """Проверяем админ или нет"""
         return await self.pool.fetchval(
-            f'SELECT EXISTS(SELECT admin_seller_telegram_id FROM admin_sellers WHERE admin_seller_telegram_id = {user_id})'
+            f'SELECT EXISTS(SELECT admin_seller_telegram_id FROM admin_sellers WHERE admin_seller_telegram_id = {user_id}) '
         )
 
     async def is_seller(self, user_id):
@@ -1586,12 +1590,6 @@ WHERE lc_category_id = {category_id} AND lc_location_id={location_id}"""
             f"""UPDATE products SET is_product_available=true WHERE product_id = {product_id}"""
         )
 
-    async def return_to_stock_item(self, product_id):
-        """Возвращаем в продажу товар"""
-        await self.pool.execute(
-            f"""UPDATE products SET is_product_available=true WHERE product_id = {product_id}"""
-        )
-
     async def add_local_object(self, local_object_name, local_object_info):
         """Добавляем объект локальной доставки"""
         sql = """
@@ -1640,12 +1638,6 @@ ORDER BY local_object_location_id
 
     async def get_courier_list(self):
         """Получаем список Продавцов локаций"""
-        return await self.pool.fetch(
-            f"""SELECT * FROM couriers ORDER BY courier_id"""
-        )
-
-    async def get_courier_list(self):
-        """Получаем список курьеров"""
         return await self.pool.fetch(
             f"""SELECT * FROM couriers ORDER BY courier_id"""
         )
@@ -2128,6 +2120,7 @@ ORDER BY order_id"""
         return await self.pool.fetchval(
             f"""SELECT info FROM about"""
         )
+
     async def get_objects(self):
         """Получаем список с названиями точек доставки"""
         return await self.pool.fetch(

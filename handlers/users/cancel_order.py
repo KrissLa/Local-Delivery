@@ -67,7 +67,6 @@ async def first_start(message: types.Message, state: FSMContext):
     await message.answer('\n'.join(text))
 
 
-
 @dp.callback_query_handler(text='cancel_order', state=['*'])
 async def cancel_order(call: CallbackQuery, state: FSMContext):
     """Отмена заказа, очистка корзины"""
