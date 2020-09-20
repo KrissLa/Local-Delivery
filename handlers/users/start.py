@@ -1,8 +1,9 @@
-from aiogram import types
 from re import compile
+
+from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import CommandStart
-from aiogram.types import CallbackQuery, ContentTypes
+from aiogram.types import CallbackQuery
 
 from filters.users_filters import HasNoMetro, HasNoLocation, HasNoLocalObject, IsNotClientMessage
 from keyboards.default.menu import menu_keyboard
@@ -35,7 +36,7 @@ async def bot_start_referal(message: types.Message, state: FSMContext):
                                      f"\nДля оформления заказа выберите ближайшее метро.",
                                      reply_markup=await generate_keyboard_with_metro())
                 await SignUpUser.Metro.set()
-        except:
+        except Exception as err:
             await message.answer(f"Приветствуем! \n"
                                  f"Ваша реферальная ссылка недействительна."
                                  f"\nДля оформления заказа выберите ближайшее метро.",

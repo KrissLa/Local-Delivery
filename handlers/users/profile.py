@@ -44,7 +44,7 @@ async def send_categories_menu(message: types.Message):
                                          )
                                      ]
                                  ]))
-    except:
+    except Exception as err:
         await message.answer(f"Сначала нужно выбрать ближайшую станцию метро и точку продаж",
                              reply_markup=await generate_keyboard_with_metro())
         await SignUpUser.Metro.set()

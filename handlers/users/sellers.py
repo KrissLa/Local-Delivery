@@ -49,7 +49,7 @@ async def seller_confirms_order(call: CallbackQuery, callback_data: dict):
                 await call.message.answer(f'Заказ № {order_id} подтвержден!\n'
                                           f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
                                           f'Не забудьте отметить готовность заказа. Найти его можно в /active_orders')
-            except:
+            except Exception as err:
                 await call.message.answer(f'Не удалось отправить подтверждение пользователю.'
                                           f'Заказ № {order_id} подтвержден!\n'
                                           f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
@@ -81,7 +81,7 @@ async def select_courier(call: CallbackQuery, callback_data: dict, state: FSMCon
         await send_confirm_message_to_user_delivery(order_info, courier_name)
         await call.message.answer("Уведомления курьеру и клиенту отправлены."
                                   'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
-    except:
+    except Exception as err:
         await call.message.answer("Не удалось отправить уведомление пользователю"
                                   "Уведомления курьеру отправлено."
                                   'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')

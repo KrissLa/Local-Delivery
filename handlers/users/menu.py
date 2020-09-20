@@ -184,7 +184,7 @@ async def get_quantity_more_than_6(message: types.Message, state: FSMContext):
             await message.answer(text='Оформить заказ\n'
                                       'i Доставка работает в будни с 11 до 17',
                                  reply_markup=delivery_options_markup)
-    except:
+    except Exception as err:
         await message.answer("Пожалуйста, напишите количество товара (6 или больше)")
         if await state.get_state() == 'Menu:WaitQuantity6BackWithSize':
             await Menu.WaitQuantity6BackWithSize.set()
