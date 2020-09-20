@@ -169,7 +169,7 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
                 await db.set_bonus_order_status(bonus_order_info["bonus_order_id"], "Отклонен")
                 await state.finish()
 
-    except:
+    except Exception as err:
         await message.answer('Напишите количество.\n'
                              f"Вам доступно - {count_bonus} шт.",
                              reply_markup=back_cancel_bonus_markup)

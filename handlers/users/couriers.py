@@ -78,7 +78,7 @@ async def confirm_delivery_courier(call: CallbackQuery, callback_data: dict):
                                    f'Ваш заказ № {order_id} доставлен.\n'
                                    f'Приятного аппетита!')
             await call.message.answer(f'Заказ № {order_id} доставлен!')
-        except:
+        except Exception as err:
             await call.message.answer(f'Не удалось отправить уведомление пользователю.\n'
                                       f'Заказ отмечен как доставлен.')
     else:
