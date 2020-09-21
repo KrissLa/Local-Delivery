@@ -18,7 +18,7 @@ class Database:
             user=config.PGUSER,
             database=config.PGDATABASE,
             password=config.PGPASSWORD,
-            host="db",
+            host="localhost",
             port=config.PORT,
             statement_cache_size=0
         )
@@ -437,8 +437,9 @@ AND is_local_object_available = true ORDER BY metro_id""")
 
     async def get_product_for_user_location_id(self, user_id, category_id):
         """Получаем список доступных товаров в локации пользователя"""
+        prod_result = []
         sql = f"""
-        SELECT products.product_name, products.product_id
+        SELECT products.product_name, products.product_id, price_1
         FROM locations_products 
         JOIN products ON locations_products.lp_product_id=products.product_id
         WHERE products.product_category_id = {category_id}
@@ -448,7 +449,20 @@ AND is_local_object_available = true ORDER BY metro_id""")
         AND products.is_product_available = true
 		ORDER BY product_id;
         """
-        return await self.pool.fetch(sql)
+        products_list = await self.pool.fetch(sql)
+        print(products_list)
+        for prod in products_list:
+            if prod['price_1']:
+                prod_result.append(prod)
+            else:
+                with_size = await self.pool.fetchval(
+                    f"""SELECT EXISTS(SELECT size_id FROM product_sizes 
+                            WHERE size_product_id = {prod['product_id']})"""
+                )
+                print(with_size)
+                if with_size:
+                    prod_result.append(prod)
+        return prod_result
 
     async def get_product_info_by_id(self, product_id, user_id):
         """Получаем подробную информацию о товаре"""

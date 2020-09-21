@@ -77,3 +77,12 @@ async def cancel_order(call: CallbackQuery, state: FSMContext):
     await call.answer("Вы отменили заказ. Корзина товаров очищена")
     await call.message.answer('Вы в главном меню',
                               reply_markup=menu_keyboard)
+
+
+@dp.callback_query_handler(text='cancel_order_menu', state=['*'])
+async def cancel_order_menu(call: CallbackQuery, state: FSMContext):
+    """cancel_order_menu"""
+    await call.message.edit_reply_markup()
+    await state.finish()
+    await call.message.answer('Вы в главном меню',
+                              reply_markup=menu_keyboard)
