@@ -121,7 +121,7 @@ async def get_bonus_order(call: CallbackQuery, callback_data: dict, state: FSMCo
     await Bonus.Count.set()
 
 
-@dp.message_handler(regexp="\d+", state=Bonus.Count)
+@dp.message_handler(state=Bonus.Count)
 async def get_count_bonus(message: types.Message, state: FSMContext):
     data = await state.get_data()
     count_bonus = data.get('count_bonus')
@@ -161,7 +161,7 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
                                          ]
                                      ]))
                 await send_message_to_sellers_bonus(sellers_list, bonus_order_info)
-                await Bonus.WaitSeller.set()
+                await state.finish()
             else:
                 await message.answer('Нет доступных продавцов. Попробуйте позже.')
                 await db.change_bonus_plus(user_id=message.from_user.id,
@@ -176,7 +176,7 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
         await Bonus.Count.set()
 
 
-@dp.callback_query_handler(cancel_bonus_order_data.filter(), state=Bonus.WaitSeller)
+@dp.callback_query_handler(cancel_bonus_order_data.filter())
 async def cancel_bonus_order(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Отмена бонусного заказа после ввода количества"""
     await call.message.edit_reply_markup()
@@ -190,7 +190,7 @@ async def cancel_bonus_order(call: CallbackQuery, callback_data: dict, state: FS
         await state.finish()
         await call.message.answer(f'Ваш заказ № {b_order_id}Б отменен.')
     else:
-        await call.message.answer('Ваш заказ уже подтвержден. Если что-то не так, пожалуйста, подойдите к продавцу.')
+        await call.message.answer('Ваш заказ уже подтвержден. Чтобы отменить его, пожалуйста, подойдите к продавцу.')
 
 
 @dp.callback_query_handler(text='return_to_bot', state=Bonus.WaitSeller)

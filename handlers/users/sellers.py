@@ -270,6 +270,7 @@ async def confirm_delivery_seller(message: types.Message):
 @dp.callback_query_handler(IsSellerCallback(), order_is_delivered.filter())
 async def confirm_delivery_courier(call: CallbackQuery, callback_data: dict):
     """Продавец подтверждает выдачу"""
+    await call.message.edit_reply_markup()
     order_id = int(callback_data.get('order_id'))
     user_id = int(callback_data.get('user_id'))
     if await db.order_is_delivered(order_id, user_id):
@@ -297,16 +298,7 @@ async def confirm_bonus_order_seller(call: CallbackQuery, callback_data: dict):
         bonus_order_info = await db.get_bonus_order_info_by_id(b_order_id)
         await bot.send_message(chat_id=bonus_order_info['bonus_order_user_telegram_id'],
                                text=f"Ваш бонусный заказ № {bonus_order_info['bonus_order_id']}Б подтвержден.\n"
-                                    f"Когда он будет готов Вам придет уведомление.\n"
-                                    f"Чтобы вернуться к функциям бота, пожалуйста, нажмите кнопку.",
-                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                   [
-                                       InlineKeyboardButton(
-                                           text='Отлично!',
-                                           callback_data='return_to_bot'
-                                       )
-                                   ]
-                               ]))
+                                    f"Когда он будет готов Вам придет уведомление.\n")
         await call.message.answer(f'Бонусный заказ № {bonus_order_info["bonus_order_id"]}Б подтвержден\n'
                                   f'Когда он будет готов, сообщите клиенту: /confirm_readiness_bonus_orders')
     else:
@@ -330,6 +322,7 @@ async def set_ready_bonus_orders(message: types.Message):
 @dp.callback_query_handler(active_bonus_order_data.filter(), state=['*'])
 async def confirm_readiness_bonus(call: CallbackQuery, callback_data: dict):
     """Отмечааем бонусный заказ как готов"""
+    await call.message.edit_reply_markup()
     b_order_id = int(callback_data.get('order_id'))
     client_id = int(callback_data.get('user_id'))
     await db.set_bonus_order_status(b_order_id, 'Готов')
@@ -367,6 +360,7 @@ async def bonus_orders_to_confirm_delivery(message: types.Message):
 @dp.callback_query_handler(bonus_order_is_delivered_data.filter(), state=['*'])
 async def bonus_order_is_delivered(call: CallbackQuery, callback_data: dict):
     """Отмечаем бонусынй заказ как выдан"""
+    await call.message.edit_reply_markup()
     b_order_id = int(callback_data.get('order_id'))
     client_id = int(callback_data.get('user_id'))
     await db.set_bonus_order_status(b_order_id, 'Выдан')

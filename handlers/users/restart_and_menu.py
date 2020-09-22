@@ -13,7 +13,7 @@ from states.menu_states import Menu
                            Menu.WaitQuantity, Menu.WaitQuantityBack, Menu.WaitProductSize,
                            Menu.WaitProductSizeBack, Menu.WaitQuantityBackWithSize,
                            Menu.OneMoreOrNext, Menu.WaitUserConfirmationDelivery,
-                           Menu.WaitUserConfirmationPickup, Bonus.Count,
+                           Menu.WaitUserConfirmationPickup,
                            Menu.WaitQuantityBackWithSizeId, Menu.WaitQuantity6,
                            Menu.WaitQuantity6Back, Menu.WaitQuantity6BackWithSize,
                            Menu.WaitQuantity6BackWithSizeId, Menu.WaitPass,
