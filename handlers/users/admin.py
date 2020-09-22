@@ -9,7 +9,7 @@ from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_key_
     generate_key_board_with_metro, yes_and_cancel_admin_markup, generate_key_board_with_locations, \
     add_one_more_local_object, add_one_more_category_markup, generate_keyboard_with_categories_for_add_item, \
     item_with_size, confirm_item_markup, add_one_more_product_size, generate_keyboard_with_metro_for_seller_admin, \
-    get_edit_item_markup, back_button
+    get_edit_item_markup, back_button, back_to_choices_sizes, confirm_item_markup_first
 from loader import dp, bot, db
 from states.admin_state import AddAdmin
 from utils.temp_orders_list import get_list_of_location_message, get_list_of_local_objects, get_list_of_category, \
@@ -63,7 +63,7 @@ async def get_ban_reason(message: types.Message, state: FSMContext):
 async def unban_user(message: types.Message):
     """Разбан пользователя"""
     await message.answer('Введите telegramID Пользователя',
-                             reply_markup=cancel_admin_markup)
+                         reply_markup=cancel_admin_markup)
     await AddAdmin.UnBanID.set()
 
 
@@ -621,6 +621,42 @@ async def get_item_description(message: types.Message, state: FSMContext):
     await AddAdmin.ItemSize.set()
 
 
+@dp.callback_query_handler(text='back', state=[AddAdmin.ItemSizeNameFirst,
+                                               AddAdmin.ItemSizePriceFirst,
+                                               AddAdmin.ItemSizeConfirmFirst])
+async def back_to_sizes_or_not(call: CallbackQuery, state: FSMContext):
+    """Возврат к выбору один размер или несколько"""
+    data = await state.get_data()
+    product_id = data.get('product_id')
+    await db.delete_product_by_id(product_id)
+    new_item = data.get('new_item')
+    await call.message.answer(f"Вы ввели:\n"
+                              f"Категория: {new_item['category_name']}\n"
+                              f"Название: {new_item['item_name']}\n"
+                              f"Фотография добавлена\n"
+                              f"Описание: {new_item['item_description']}\n\n"
+                              f"У товара есть размеры?",
+                              reply_markup=item_with_size)
+    await AddAdmin.ItemSize.set()
+
+
+# @dp.callback_query_handler(text='cancel', state=[AddAdmin.ItemSizeName,
+#                                                AddAdmin.ItemSizePrice,
+#                                                AddAdmin.ItemSizeConfirm])
+# async def back_to_sizes_or_not(call: CallbackQuery, state: FSMContext):
+#     """Возврат к выбору один размер или несколько"""
+#     data = await state.get_data()
+#     new_item = data.get('new_item')
+#     await call.message.answer(f"Вы ввели:\n"
+#                               f"Категория: {new_item['category_name']}\n"
+#                               f"Название: {new_item['item_name']}\n"
+#                               f"Фотография добавлена\n"
+#                               f"Описание: {new_item['item_description']}\n\n"
+#                               f"У товара есть размеры?",
+#                               reply_markup=item_with_size)
+#     await AddAdmin.ItemSize.set()
+
+
 @dp.callback_query_handler(new_item_size.filter(status='True'), state=AddAdmin.ItemSize)
 async def item_has_size(call: CallbackQuery, state: FSMContext):
     """У товара есть размеры"""
@@ -628,15 +664,62 @@ async def item_has_size(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     new_item = data.get('new_item')
     product_id = await db.add_product_with_size(new_item)
-    await state.finish()
     await state.update_data(product_id=product_id)
     await call.message.answer('Вы добавили новый товар.\n'
                               f'Название: {new_item["item_name"]}\n'
                               f'Фото добавлено\n'
                               f'Описание: {new_item["item_description"]}\n\n'
                               f'Введите название размера товара',
-                              reply_markup=cancel_admin_markup)
-    await AddAdmin.ItemSizeName.set()
+                              reply_markup=back_to_choices_sizes)
+    await AddAdmin.ItemSizeNameFirst.set()
+
+
+@dp.message_handler(state=AddAdmin.ItemSizeNameFirst)
+async def get_item_size_name(message: types.Message, state: FSMContext):
+    """Получаем название размера"""
+    size_name = message.text
+    await state.update_data(size_name=size_name)
+    await message.answer(f'Вы ввели:\n'
+                         f'Название размера: {size_name}\n\n'
+                         f'Теперь введите цену при заказе разного количества ЧЕРЕЗ ЗАПЯТУЮ, например:\n'
+                         f"200, 190, 180, 170, 160, 150\n"
+                         f"Соответствует: 1шт - 200 руб, 2шт - 190 руб, 3шт - 180 руб, 4шт - 170 руб, "
+                         f"5шт - 160 руб, 6шт - 150 руб",
+                         reply_markup=back_to_choices_sizes)
+    await AddAdmin.ItemSizePriceFirst.set()
+
+
+@dp.message_handler(state=AddAdmin.ItemSizePriceFirst)
+async def get_prices_for_size(message: types.Message, state: FSMContext):
+    """Получаем цены"""
+    prices = message.text
+    try:
+        list_of_prices = prices.split(', ')
+        data = await state.get_data()
+        size_name = data.get('size_name')
+        size_prices = {
+            'price1': int(list_of_prices[0]),
+            'price2': int(list_of_prices[1]),
+            'price3': int(list_of_prices[2]),
+            'price4': int(list_of_prices[3]),
+            'price5': int(list_of_prices[4]),
+            'price6': int(list_of_prices[5])
+        }
+        await state.update_data(size_prices=size_prices)
+        await message.answer(f"Вы ввели:\n"
+                             f"Название размера: {size_name}\n"
+                             f"Фотография добавлена\n"
+                             f"Цена за 1 шт - {size_prices['price1']} руб\n"
+                             f"Цена за 2 шт - {size_prices['price2']} руб\n"
+                             f"Цена за 3 шт - {size_prices['price3']} руб\n"
+                             f"Цена за 4 шт - {size_prices['price4']} руб\n"
+                             f"Цена за 5 шт - {size_prices['price5']} руб\n"
+                             f"Цена за 6 шт - {size_prices['price6']} руб\n",
+                             reply_markup=confirm_item_markup_first)
+        await AddAdmin.ItemSizeConfirmFirst.set()
+    except Exception as err:
+        await message.answer('Попробуйте еще раз ввести цены.')
+        await AddAdmin.ItemSizePriceFirst.set()
 
 
 @dp.message_handler(state=AddAdmin.ItemSizeName)
@@ -687,7 +770,7 @@ async def get_prices_for_size(message: types.Message, state: FSMContext):
         await AddAdmin.ItemSizePrice.set()
 
 
-@dp.callback_query_handler(text='save_item', state=AddAdmin.ItemSizeConfirm)
+@dp.callback_query_handler(text='save_item', state=[AddAdmin.ItemSizeConfirmFirst, AddAdmin.ItemSizeConfirm])
 async def save_item_without_size(call: CallbackQuery, state: FSMContext):
     """Сохраняем размер товара"""
     await call.message.edit_reply_markup()
@@ -712,7 +795,7 @@ async def save_item_without_size(call: CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query_handler(state=AddAdmin.OneMoreProductSize, text='one_more_product_size')
-async def one_more_product_size(call: CallbackQuery, state: FSMContext):
+async def one_more_product_size(call: CallbackQuery):
     """Добавляем еще один размер"""
     await call.message.edit_reply_markup()
     await call.message.answer('Введите название размера товара',
@@ -720,6 +803,8 @@ async def one_more_product_size(call: CallbackQuery, state: FSMContext):
     await AddAdmin.ItemSizeName.set()
 
 
+@dp.callback_query_handler(text='cancel', state=[AddAdmin.ItemSizeName,
+                                                 AddAdmin.ItemSizePrice])
 @dp.callback_query_handler(state=AddAdmin.OneMoreProductSize, text='add_new_product_size_done')
 async def one_more_product_size(call: CallbackQuery, state: FSMContext):
     """Завершаем добавление размеров"""

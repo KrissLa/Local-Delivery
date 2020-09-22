@@ -49,6 +49,11 @@ class AddAdmin(StatesGroup):
     ItemPrice =State()
     ItemConfirm = State()
 
+    ItemSizeNameFirst = State()
+    ItemSizePriceFirst = State()
+    ItemSizeConfirmFirst = State()
+
+
     ItemSizeName = State()
     ItemSizePrice = State()
     ItemSizeConfirm = State()

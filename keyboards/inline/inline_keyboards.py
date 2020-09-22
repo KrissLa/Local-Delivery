@@ -613,6 +613,15 @@ cancel_admin_markup = InlineKeyboardMarkup(inline_keyboard=[
     ]
 ])
 
+back_to_choices_sizes = InlineKeyboardMarkup(inline_keyboard=[
+    [
+        InlineKeyboardButton(
+            text='Назад к выбору количества размеров',
+            callback_data='back'
+        )
+    ]
+])
+
 confirm_item_markup = InlineKeyboardMarkup(inline_keyboard=[
     [
         InlineKeyboardButton(
@@ -624,6 +633,23 @@ confirm_item_markup = InlineKeyboardMarkup(inline_keyboard=[
         InlineKeyboardButton(
             text='Отмена',
             callback_data='cancel'
+        )
+    ]
+
+])
+
+
+confirm_item_markup_first = InlineKeyboardMarkup(inline_keyboard=[
+    [
+        InlineKeyboardButton(
+            text='Сохраняем',
+            callback_data='save_item'
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='Назад к выбору количества размеров',
+            callback_data='back'
         )
     ]
 
