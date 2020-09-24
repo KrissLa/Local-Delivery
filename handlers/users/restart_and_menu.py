@@ -6,7 +6,27 @@ from keyboards.default.menu import menu_keyboard
 from loader import dp
 from states.admin_state import AddAdmin
 from states.menu_states import Menu
+from states.profile_states import ProfileState
 from states.seller_admin_states import SellerAdmin
+
+
+@dp.message_handler(text=['Меню', 'Акции и бонусы', 'Профиль', 'О сервисе'],
+                    state=[ProfileState.WaitAddress,
+                           Menu.WaitAddress])
+async def restart(message: types.Message):
+    """restart"""
+    await message.answer('Если Вы не хотите прерывать заказ, просто продолжите его выше.'
+                         ' Если хотите прервать заказ, нажмите на кнопку.',
+                         reply_markup=InlineKeyboardMarkup(
+                             inline_keyboard=[
+                                 [
+                                     InlineKeyboardButton(
+                                         text='Да, прервать заказ.',
+                                         callback_data='cancel_order_menu'
+                                     )
+                                 ]
+                             ]
+                         ))
 
 
 @dp.message_handler(state=[SellerAdmin.RemoveItemFromStockCategory,
@@ -63,8 +83,7 @@ async def restart(message: types.Message):
                          ))
 
 
-
-@dp.message_handler(state=[Menu.WaitTime, Menu.WaitAddress, Menu.WaitCategory, Menu.WaitProduct,
+@dp.message_handler(state=[Menu.WaitTime, Menu.WaitCategory, Menu.WaitProduct,
                            Menu.WaitProductSize,
                            Menu.WaitProductSizeBack,
                            Menu.OneMoreOrNext, Menu.WaitUserConfirmationDelivery,
