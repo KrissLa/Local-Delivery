@@ -61,6 +61,7 @@ async def seller_confirms_order(call: CallbackQuery, callback_data: dict):
                                           reply_markup=await generate_couriers_keyboard(couriers, order_id))
                 await SelectCourier.WaitCourier.set()
             else:
+                await db.update_order_status(order_id, 'Ожидание подтверждения продавца')
                 await call.message.answer('Нет доступных курьеров. Свяжитесь с кем-нибудь. Заказ потом можно найти в '
                                           '/unaccepted_orders')
     else:
