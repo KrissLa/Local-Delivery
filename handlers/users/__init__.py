@@ -1,3 +1,4 @@
+from .paginations import dp
 from .admin import dp
 from .cancel_order import dp
 from .start import dp

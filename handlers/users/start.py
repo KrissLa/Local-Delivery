@@ -61,11 +61,12 @@ async def bot_start(message: types.Message):
 
 
 @dp.callback_query_handler(metro_data.filter(), state=SignUpUser.Metro)
-async def get_user_location(call: CallbackQuery, callback_data: dict):
+async def get_user_location(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Предлагаем пользователю выбрать локацию"""
     await call.answer(cache_time=10)
     await call.message.edit_reply_markup()
     metro_id = int(callback_data.get('metro_id'))
+    await state.update_data(metro_id=metro_id)
     metro_name = await db.get_metro_name_by_metro_id(metro_id)
     await call.message.answer(f"Вы выбрали {metro_name} \n"
                               f"Выберите объект локальной доставки",

@@ -57,3 +57,7 @@ edit_item_data = CallbackData('edit_item', 'item_id', 'subject')
 edit_item_sizes_data = CallbackData('edit_item_sizes', 'item_id', 'subject')
 
 edit_size_data = CallbackData('edit_size', 'size_id', 'subject')
+
+page_call_data = CallbackData('next', 'page')
+
+back_data = CallbackData('back', 'page')

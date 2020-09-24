@@ -86,3 +86,13 @@ async def cancel_order_menu(call: CallbackQuery, state: FSMContext):
     await state.finish()
     await call.message.answer('Вы в главном меню',
                               reply_markup=menu_keyboard)
+
+
+@dp.callback_query_handler(text='cancel_admin', state=['*'])
+async def cancel_admin(call: CallbackQuery, state: FSMContext):
+    """cancel_admin"""
+    await call.message.edit_reply_markup()
+    await state.finish()
+    await call.message.answer('Операция прервана\n'
+                              'Вы в главном меню',
+                              reply_markup=menu_keyboard)

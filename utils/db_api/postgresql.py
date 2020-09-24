@@ -1468,7 +1468,7 @@ WHERE order_id = {order_id}"""
     async def get_list_of_locations(self):
         """Получаем список локаций"""
         return await self.pool.fetch(
-            "SELECT * FROM local_objects ORDER BY local_object_id"
+            "SELECT * FROM locations ORDER BY location_id"
         )
 
     async def get_list_of_categories(self):
@@ -1480,7 +1480,7 @@ WHERE order_id = {order_id}"""
     async def get_list_of_local_object(self):
         """Получаем список локаций"""
         return await self.pool.fetch(
-            "SELECT * FROM locations ORDER BY location_id"
+            "SELECT * FROM local_objects ORDER BY location_id"
         )
 
     async def get_metro_name_by_location_metro_id(self, location_metro_id):
@@ -1957,9 +1957,9 @@ WHERE admin_seller_id={seller_admin_id}"""
     async def get_categories_with_products(self):
         """Все категории, в которых есть товары"""
         return await self.pool.fetch(
-            f"""SELECT category_id, category_name 
+            f"""SELECT DISTINCT category_id, category_name 
 FROM categories
-JOIN products ON product_category_id=category_id ORDER BY product_category_id"""
+JOIN products ON product_category_id=category_id ORDER BY category_id"""
         )
 
     async def product_has_size(self, product_id):

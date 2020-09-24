@@ -45,11 +45,12 @@ async def send_categories_menu(message: types.Message):
 
 
 @dp.callback_query_handler(categories_data.filter(), state=Menu.WaitCategory)
-async def send_products(call: CallbackQuery, callback_data: dict):
+async def send_products(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Отправляем товары из выбранной категории, доступные в локации пользователя"""
     await call.message.edit_reply_markup()
     await call.answer(cache_time=10)
     category_id = callback_data.get('category_id')
+    await state.update_data(category_id=category_id)
     products = await db.get_product_for_user_location_id(call.from_user.id, category_id)
     if products:
         await call.message.edit_reply_markup(await generate_keyboard_with_products(products))

@@ -4,7 +4,7 @@ from aiogram.types import CallbackQuery, ContentTypes, InlineKeyboardMarkup, Inl
 
 from filters.users_filters import IsAdminMessage
 from keyboards.inline.callback_datas import admin_data, metro_del_data, location_data, categories_data, new_item_size, \
-    edit_item_data, edit_item_sizes_data, edit_size_data
+    edit_item_data, edit_item_sizes_data, edit_size_data, page_call_data
 from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_key_board_with_admins, \
     generate_key_board_with_metro, yes_and_cancel_admin_markup, generate_key_board_with_locations, \
     add_one_more_local_object, add_one_more_category_markup, generate_keyboard_with_categories_for_add_item, \
@@ -92,6 +92,9 @@ async def publish_post(message: types.Message):
     await AddAdmin.PromoPhoto.set()
 
 
+
+
+
 @dp.message_handler(state=AddAdmin.PromoPhoto, content_types=ContentTypes.PHOTO)
 async def get_promo_photo(message: types.Message, state: FSMContext):
     """Получаем фото"""
@@ -100,6 +103,13 @@ async def get_promo_photo(message: types.Message, state: FSMContext):
     await message.answer('Готово. Теперь введите подпись к фото.',
                          reply_markup=cancel_admin_markup)
     await AddAdmin.PromoCaption.set()
+
+
+@dp.message_handler(state=[AddAdmin.PromoPhoto])
+async def wait_photo(message: types.Message):
+    """restart"""
+    await message.answer('Необходимо загрузить фотографию',
+                         reply_markup=cancel_admin_markup)
 
 
 @dp.message_handler(state=AddAdmin.PromoCaption)
@@ -205,18 +215,19 @@ async def get_admin_id(message: types.Message, state: FSMContext):
 @dp.message_handler(IsAdminMessage(), commands=['delete_admin'])
 async def get_list_admin(message: types.Message):
     """Получаем список админов админа"""
-    await message.answer('Пожалуйста, выберите админа, которого будем удалять',
+    await message.answer('Пожалуйста, выберите админа, которого будем удалять.\n'
+                         '! Внимание! Удаление происходит сразу после нажатия на кнопку',
                          reply_markup=await generate_key_board_with_admins())
     await AddAdmin.WaitDeleteAdmins.set()
 
 
 @dp.callback_query_handler(admin_data.filter(), state=AddAdmin.WaitDeleteAdmins)
-async def delete_admin(call: CallbackQuery, callback_data: dict, state: FSMContext):
+async def delete_admin(call: CallbackQuery, callback_data: dict):
     """Удаляем админа"""
     admin_id = int(callback_data.get('admin_id'))
     await db.delete_admin(admin_id)
-    await call.message.answer("Админ удален")
-    await state.finish()
+    await call.answer("Админ удален")
+    await call.message.edit_reply_markup(await generate_key_board_with_admins())
 
 
 @dp.message_handler(IsAdminMessage(), commands=['add_metro'])
@@ -1027,7 +1038,7 @@ async def get_location_for_seller_admin(call: CallbackQuery, callback_data: dict
                                                     f'{location_name}.')
             await call.message.answer(f'{seller_admin_name} назначен админом в локации "{location_name}"')
         except Exception as err:
-            await call.message.answer(f'{seller_admin_name} назначен админом в локации "{location_name}"'
+            await call.message.answer(f'{seller_admin_name} назначен админом в локации "{location_name}"\n'
                                       "Добавил его в таблицу, но не смог отправить ему сообщение"
                                       ". Возможно он не отправил боту сообщение.\n"
                                       "Вы в главном меню")
@@ -1114,7 +1125,7 @@ async def add_seller_without_location(call: CallbackQuery, state: FSMContext):
     seller_name = data.get('name')
     if await db.add_seller_without_location(seller_id, seller_name):
         try:
-            await bot.send_message('Вам назначена должность "Продавец" пока Вы не закреплены за локацией')
+            await bot.send_message('Вам назначена должность "Продавец". Пока Вы не закреплены за локацией')
             await call.message.answer(f"{seller_name}\n"
                                       f"Назначен на должность Продавец.\n"
                                       f"Привязать его к локации Вы можете командой /change_seller_location")
@@ -1158,7 +1169,7 @@ async def get_location_for_seller(call: CallbackQuery, callback_data: dict, stat
                                               f'{location_name}.')
             await call.message.answer(f'{seller_name} назначен продавцом в локации "{location_name}"')
         except Exception as err:
-            await call.message.answer(f'{seller_name} назначен продавцом в локации "{location_name}"'
+            await call.message.answer(f'{seller_name} назначен продавцом в локации "{location_name}"\n'
                                       "Добавил его в таблицу, но не смог отправить ему сообщение"
                                       ". Возможно он не отправил боту сообщение.\n"
                                       "Вы в главном меню")
@@ -1245,7 +1256,7 @@ async def add_courier_without_location(call: CallbackQuery, state: FSMContext):
     courier_name = data.get('name')
     if await db.add_courier_without_location(courier_id, courier_name):
         try:
-            await bot.send_message('Вам назначена должность "Курьер" пока Вы не закреплены за локацией')
+            await bot.send_message('Вам назначена должность "Курьер". Пока Вы не закреплены за локацией')
             await call.message.answer(f"{courier_name}\n"
                                       f"Назначен на должность Курьер.\n"
                                       f"Привязать его к локации Вы можете командой /change_courier_location")
@@ -1289,7 +1300,7 @@ async def get_location_for_seller(call: CallbackQuery, callback_data: dict, stat
                                                f'{location_name}.')
             await call.message.answer(f'{courier_name} назначен продавцом в локации "{location_name}"')
         except Exception as err:
-            await call.message.answer(f'{courier_name} назначен продавцом в локации "{location_name}"'
+            await call.message.answer(f'{courier_name} назначен продавцом в локации "{location_name}"\n'
                                       "Добавил его в таблицу, но не смог отправить ему сообщение"
                                       ". Возможно он не отправил боту сообщение.\n"
                                       "Вы в главном меню")
@@ -1627,8 +1638,11 @@ async def change_seller_admin_location(call: CallbackQuery, callback_data: dict,
     admin_seller_id = data.get('seller_admin_id')
     await db.change_seller_admin_location(admin_seller_id, metro_id, location_id)
     seller_info = await db.get_seller_admin_name_id(admin_seller_id)
-    await bot.send_message(seller_info['admin_seller_telegram_id'],
-                           f"Вы перезакреплены в точку продаж № {location_id}")
+    try:
+        await bot.send_message(seller_info['admin_seller_telegram_id'],
+                               f"Вы перезакреплены в точку продаж № {location_id}")
+    except:
+        await call.message.answer('Не далось отправить сообщение админу локации.')
     await call.message.answer(f'{seller_info["admin_seller_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
 
@@ -1685,8 +1699,11 @@ async def change_seller_location(call: CallbackQuery, callback_data: dict, state
     seller_id = data.get('seller_id')
     await db.change_seller_location(seller_id, metro_id, location_id)
     seller_info = await db.get_seller_name_id(seller_id)
-    await bot.send_message(seller_info['seller_telegram_id'],
-                           f"Вы перезакреплены в точку продаж № {location_id}")
+    try:
+        await bot.send_message(seller_info['seller_telegram_id'],
+                               f"Вы перезакреплены в точку продаж № {location_id}")
+    except Exception as err:
+        await call.message.answer('Не удалось отправить уведомлене продавцу.')
     await call.message.answer(f'{seller_info["seller_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
 
@@ -1743,8 +1760,11 @@ async def change_courier_location(call: CallbackQuery, callback_data: dict, stat
     courier_id = data.get('courier_id')
     await db.change_courier_location(courier_id, metro_id, location_id)
     courier_info = await db.get_courier_name_id(courier_id)
-    await bot.send_message(courier_info['courier_telegram_id'],
-                           f"Вы перезакреплены в точку продаж № {location_id}")
+    try:
+        await bot.send_message(courier_info['courier_telegram_id'],
+                               f"Вы перезакреплены в точку продаж № {location_id}")
+    except:
+        await call.message.answer('Не удалось отправить уведомление курьеру.')
     await call.message.answer(f'{courier_info["courier_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
 
@@ -1793,7 +1813,7 @@ async def edit_item(message: types.Message):
 
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.EditItem)
 async def get_category_id(call: CallbackQuery, callback_data: dict):
-    """Получаем категорию, в которой находмтся товар"""
+    """Получаем категорию, в которой находится товар"""
     await call.message.edit_reply_markup()
     category_id = int(callback_data.get('category_id'))
     products = await db.get_products_list(category_id)
@@ -2751,4 +2771,4 @@ async def cancel_add_admin(call: CallbackQuery, state: FSMContext):
     """Кнопка отмены"""
     await call.message.edit_reply_markup()
     await state.finish()
-    await call.message.answer('Вы отменили операцию')
+    await call.message.answer('Вы отменили/завершили операцию')
