@@ -426,10 +426,10 @@ async def user_confirm_order(call: CallbackQuery, state: FSMContext):
     """Пользователь подтвердил заказ"""
     await call.message.edit_reply_markup()
     order_id = await db.get_last_order_id(call.from_user.id)
-    await db.update_order_status_and_created_at(order_id, 'Ожидание подтверждения продавца')
     order_data = await db.get_last_user_order_detail_after_confirm(user_id=call.from_user.id)
     sellers_list = await db.get_sellers_id_for_location(order_data['order_location_id'])
     if sellers_list:
+        await db.update_order_status_and_created_at(order_id, 'Ожидание подтверждения продавца')
         await send_message_to_sellers(sellers_list, order_data)
         await db.clear_cart(call.from_user.id)
         await call.message.answer(f"Готово.\n"
@@ -439,4 +439,5 @@ async def user_confirm_order(call: CallbackQuery, state: FSMContext):
         await call.message.answer(f"Простите. Не нашел доступных продавцов.\n"
                                   f"Ваши товары помещены в корзину: /cart\n"
                                   f"Если Вы считаете что произошла ошибка, пожалуйста свяжитесь с нами.")
+
         await state.finish()
