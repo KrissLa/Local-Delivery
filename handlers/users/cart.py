@@ -46,35 +46,35 @@ async def menu(message: types.Message):
                          reply_markup=menu_keyboard)
 
 
-@dp.message_handler(commands=['order_status'], state=['*'])
-async def get_order_status(message: types.Message):
-    """Статус заказа"""
-    orders = await db.get_orders_for_user(message.from_user.id)
-    if orders:
-        for order in orders:
-            if order['delivery_method'] == 'С доставкой':
-                if order['deliver_to']:
-                    await message.answer(f"Заказ № {order['order_id']}\n"
-                                         f"{order['order_info']}"
-                                         f"Стоимость: {order['order_price']}\n"
-                                         f"Будет готов в {order['deliver_to'].strftime('%H:%M')}\n"
-                                         f"Статус заказа - {order['order_status']}\n\n")
-                else:
-                    await message.answer(f"Заказ № {order['order_id']}\n"
-                                         f"{order['order_info']}\n"
-                                         f"Стоимость: {order['order_price']}\n"
-                                         f"Статус заказа - {order['order_status']}\n\n")
-            else:
-                if order['deliver_to']:
-                    await message.answer(f"Заказ № {order['order_id']}\n"
-                                         f"{order['order_info']}"
-                                         f"Стоимость: {order['order_price']}\n"
-                                         f"Будет доставлен в {order['deliver_to'].strftime('%H:%M')}\n"
-                                         f"Статус заказа - {order['order_status']}\n\n")
-                else:
-                    await message.answer(f"Заказ № {order['order_id']}\n"
-                                         f"{order['order_info']}"
-                                         f"Стоимость: {order['order_price']}\n"
-                                         f"Статус заказа - {order['order_status']}\n\n")
-    else:
-        await message.answer('Нет активных заказов')
+# @dp.message_handler(commands=['order_status'], state=['*'])
+# async def get_order_status(message: types.Message):
+#     """Статус заказа"""
+#     orders = await db.get_orders_for_user(message.from_user.id)
+#     if orders:
+#         for order in orders:
+#             if order['delivery_method'] == 'С доставкой':
+#                 if order['deliver_to']:
+#                     await message.answer(f"Заказ № {order['order_id']}\n"
+#                                          f"{order['order_info']}"
+#                                          f"Стоимость: {order['order_price']}\n"
+#                                          f"Будет готов в {order['deliver_to'].strftime('%H:%M')}\n"
+#                                          f"Статус заказа - {order['order_status']}\n\n")
+#                 else:
+#                     await message.answer(f"Заказ № {order['order_id']}\n"
+#                                          f"{order['order_info']}\n"
+#                                          f"Стоимость: {order['order_price']}\n"
+#                                          f"Статус заказа - {order['order_status']}\n\n")
+#             else:
+#                 if order['deliver_to']:
+#                     await message.answer(f"Заказ № {order['order_id']}\n"
+#                                          f"{order['order_info']}"
+#                                          f"Стоимость: {order['order_price']}\n"
+#                                          f"Будет доставлен в {order['deliver_to'].strftime('%H:%M')}\n"
+#                                          f"Статус заказа - {order['order_status']}\n\n")
+#                 else:
+#                     await message.answer(f"Заказ № {order['order_id']}\n"
+#                                          f"{order['order_info']}"
+#                                          f"Стоимость: {order['order_price']}\n"
+#                                          f"Статус заказа - {order['order_status']}\n\n")
+#     else:
+#         await message.answer('Нет активных заказов')
