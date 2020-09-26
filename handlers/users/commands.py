@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -12,7 +14,7 @@ from utils.temp_orders_list import get_objects_list_message
 
 
 @dp.message_handler(text="О сервисе", state=states_for_menu)
-@dp.message_handler(text="О сервисе")
+@dp.message_handler(text="О сервисе", state='*')
 async def show_about(message: types.Message, state: FSMContext):
     """Отправляем инфу о компании"""
     await reset_state(state, message)
@@ -25,7 +27,7 @@ async def show_about(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(text="Меню", state=states_for_menu)
-@dp.message_handler(text='Меню')
+@dp.message_handler(text='Меню', state='*')
 async def send_categories_menu(message: types.Message, state: FSMContext):
     """Отправляем категории товаров, доступные в локации пользователя"""
     await reset_state(state, message)
@@ -40,13 +42,12 @@ async def send_categories_menu(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(text="Профиль", state=states_for_menu)
-@dp.message_handler(text="Профиль")
+@dp.message_handler(text="Профиль", state='*')
 async def send_categories_menu(message: types.Message, state: FSMContext):
     """Отправляем информацию профиля"""
     await reset_state(state, message)
     try:
         user_info = await db.get_user_profile_info(message.from_user.id)
-        print(user_info)
         if user_info['user_address']:
             await message.answer(f"Ваш профиль\n"
                                  f"\n"
@@ -76,13 +77,14 @@ async def send_categories_menu(message: types.Message, state: FSMContext):
                                      ]
                                  ]))
     except Exception as err:
+        logging.error(err)
         await message.answer(f"Сначала нужно выбрать ближайшую станцию метро и точку продаж",
                              reply_markup=await generate_keyboard_with_metro())
         await SignUpUser.Metro.set()
 
 
 @dp.message_handler(text="Акции и бонусы", state=states_for_menu)
-@dp.message_handler(text="Акции и бонусы")
+@dp.message_handler(text="Акции и бонусы", state='*')
 async def send_categories_menu(message: types.Message, state: FSMContext):
     """Нажатие на кнопку акции и бонусы"""
     await reset_state(state, message)

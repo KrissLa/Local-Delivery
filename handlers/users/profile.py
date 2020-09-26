@@ -15,7 +15,6 @@ async def send_categories_menu(call: CallbackQuery, state: FSMContext):
     """Отправляем информацию профиля"""
     await call.message.edit_reply_markup()
     user_info = await db.get_user_profile_info(call.from_user.id)
-    print(user_info)
     if user_info['user_address']:
         await call.message.answer(f"Ваш профиль\n"
                                   f"\n"

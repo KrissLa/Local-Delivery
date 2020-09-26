@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, ContentTypes, InlineKeyboardMarkup, InlineKeyboardButton
@@ -510,6 +512,7 @@ async def get_ban_id(message: types.Message, state: FSMContext):
         await message.answer('Не получилось, попробуйте еще раз',
                              reply_markup=cancel_admin_markup)
         await AddAdmin.BanID.set()
+        logging.error(err)
 
 
 @dp.message_handler(state=AddAdmin.BanReason)
@@ -523,6 +526,7 @@ async def get_ban_reason(message: types.Message, state: FSMContext):
         await message.answer('Пользователь забанен.')
     except Exception as err:
         await message.answer('Не получилось. Попробуйте вручную через базу данных.')
+        logging.error(err)
     await state.finish()
 
 
@@ -535,9 +539,11 @@ async def get_unban_id(message: types.Message, state: FSMContext):
             await db.unban_user(unban_id)
             await message.answer('Пользователь разбанен')
         except Exception as err:
+            logging.error(err)
             await message.answer("Не получилось, попробуйте вручную через базу данных")
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer("Попробуйте ввести еще раз.",
                              reply_markup=cancel_admin_markup)
         await AddAdmin.UnBanID.set()
@@ -592,6 +598,7 @@ async def send_publish_post(message: types.Message, state: FSMContext):
                                  caption=caption)
             count += 1
         except Exception as err:
+            logging.error(err)
             count_error += 1
     await message.answer(f'Пост отправлен.\n'
                          f'Успешно - {count} сообщений.\n'
@@ -638,6 +645,7 @@ async def get_admin_id(message: types.Message, state: FSMContext):
             await message.answer('Админ с таким id уже добавлен')
             await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Не получается добавить пользователя. Возможно, он не отправил боту сообщение.'
                              'Попробуйте еще раз.',
                              reply_markup=cancel_admin_markup)
@@ -758,6 +766,7 @@ async def delete_location_by_id(message: types.Message, state: FSMContext):
         await message.answer('Локация удалена. Чтобы удалить еще одну снова введите /delete_location')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -839,6 +848,7 @@ async def delete_location_by_id(message: types.Message, state: FSMContext):
                              ' снова введите /remove_local_object')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -879,6 +889,7 @@ async def remove_category_by_id(message: types.Message, state: FSMContext):
         await message.answer('Категория удалена. Чтобы удалить еще одну снова введите /remove_category')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1049,6 +1060,7 @@ async def get_prices_for_size(message: types.Message, state: FSMContext):
                              reply_markup=confirm_item_markup_first)
         await AddAdmin.ItemSizeConfirmFirst.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Попробуйте еще раз ввести цены.')
         await AddAdmin.ItemSizePriceFirst.set()
 
@@ -1097,6 +1109,7 @@ async def get_prices_for_size(message: types.Message, state: FSMContext):
                              reply_markup=confirm_item_markup)
         await AddAdmin.ItemSizeConfirm.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Попробуйте еще раз ввести цены.')
         await AddAdmin.ItemSizePrice.set()
 
@@ -1204,6 +1217,7 @@ async def get_item_price(message: types.Message, state: FSMContext):
                              reply_markup=confirm_item_markup)
         await AddAdmin.ItemConfirm.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Попробуйте еще раз ввести цены.')
         await AddAdmin.ItemPrice.set()
 
@@ -1254,6 +1268,7 @@ async def remove_item_by_id(message: types.Message, state: FSMContext):
         await message.answer('Товар удален. Чтобы удалить еще один снова введите /remove_item')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1301,6 +1316,7 @@ async def add_seller_admin_without_location(call: CallbackQuery, state: FSMConte
                                       f"Назначен на должность Админ локации.\n"
                                       f"Привязать его к локации Вы можете командой /change_seller_admin_location")
         except Exception as err:
+            logging.error(err)
             await call.message.answer("Добавил в базу, но не смог отправить ему сообщение. Возможно, он не написал "
                                       "ничего боту.\n"
                                       f"{seller_admin_name}\n"
@@ -1340,6 +1356,7 @@ async def get_location_for_seller_admin(call: CallbackQuery, callback_data: dict
                                                     f'{location_name}.')
             await call.message.answer(f'{seller_admin_name} назначен админом в локации "{location_name}"')
         except Exception as err:
+            logging.error(err)
             await call.message.answer(f'{seller_admin_name} назначен админом в локации "{location_name}"\n'
                                       "Добавил его в таблицу, но не смог отправить ему уведомление"
                                       ". Возможно, он не отправил боту сообщение.\n"
@@ -1359,6 +1376,7 @@ async def remove_seller_admin_by_id(message: types.Message, state: FSMContext):
         await message.answer('Админ локации удален. Чтобы удалить еще одного снова введите /remove_seller_admin')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1406,6 +1424,7 @@ async def add_seller_without_location(call: CallbackQuery, state: FSMContext):
                                       f"Назначен на должность Продавец.\n"
                                       f"Привязать его к локации Вы можете командой /change_seller_location")
         except Exception as err:
+            logging.error(err)
             await call.message.answer("Добавил в базу, но не смог отправить ему сообщение. Возможно, он не написал "
                                       "ничего боту.\n"
                                       f"{seller_name}\n"
@@ -1445,6 +1464,7 @@ async def get_location_for_seller(call: CallbackQuery, callback_data: dict, stat
                                               f'{location_name}.')
             await call.message.answer(f'{seller_name} назначен продавцом в локации "{location_name}"')
         except Exception as err:
+            logging.error(err)
             await call.message.answer(f'{seller_name} назначен продавцом в локации "{location_name}"\n'
                                       "Добавил его в таблицу, но не смог отправить ему уведомление"
                                       ". Возможно, он не отправил боту сообщение.\n"
@@ -1464,6 +1484,7 @@ async def remove_seller_by_id(message: types.Message, state: FSMContext):
         await message.answer('Продавец удален. Чтобы удалить еще одного снова введите /remove_seller')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1511,6 +1532,7 @@ async def add_courier_without_location(call: CallbackQuery, state: FSMContext):
                                       f"Назначен на должность Курьер.\n"
                                       f"Привязать его к локации Вы можете командой /change_courier_location")
         except Exception as err:
+            logging.error(err)
             await call.message.answer("Добавил в базу, но не смог отправить ему сообщение. Возможно, он не написал "
                                       "ничего боту.\n"
                                       f"{courier_name}\n"
@@ -1550,6 +1572,7 @@ async def get_location_for_seller(call: CallbackQuery, callback_data: dict, stat
                                                f'{location_name}.')
             await call.message.answer(f'{courier_name} назначен продавцом в локации "{location_name}"')
         except Exception as err:
+            logging.error(err)
             await call.message.answer(f'{courier_name} назначен продавцом в локации "{location_name}"\n'
                                       "Добавил его в таблицу, но не смог отправить ему уведомление"
                                       ". Возможно, он не отправил боту сообщение.\n"
@@ -1569,6 +1592,7 @@ async def remove_courier_by_id(message: types.Message, state: FSMContext):
         await message.answer('Курьер удален. Чтобы удалить еще одного снова введите /remove_courier')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1583,6 +1607,7 @@ async def reset_seller_admin_by_id(message: types.Message, state: FSMContext):
                              ' Чтобы открепить еще одного снова введите /reset_seller_admin_location')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1597,6 +1622,7 @@ async def reset_seller_by_id(message: types.Message, state: FSMContext):
                              ' Чтобы открепить еще одного снова введите /reset_seller_location')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1611,6 +1637,7 @@ async def reset_courier_by_id(message: types.Message, state: FSMContext):
                              ' Чтобы открепить еще одного снова введите /reset_courier_location')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1627,6 +1654,7 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
                              'Чтобы вернуть в продажу введите /return_category_to_stock')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1643,6 +1671,7 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
                              'Чтобы убрать из продажи введите /remove_category_from_stock')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1675,6 +1704,7 @@ async def remove_item_from_stock_by_id(message: types.Message, state: FSMContext
                              'Чтобы вернуть в продажу введите /return_item_to_stock')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1707,6 +1737,7 @@ async def return_item_to_stock_by_id(message: types.Message, state: FSMContext):
                              'Чтобы убрать из продажи введите /remove_item_from_stock')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1721,6 +1752,7 @@ async def change_seller_admin_location_by_id(message: types.Message, state: FSMC
                              reply_markup=await generate_key_board_with_metro())
         await AddAdmin.ChangeSellerAdminMetro.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1749,7 +1781,8 @@ async def change_seller_admin_location(call: CallbackQuery, callback_data: dict,
     try:
         await bot.send_message(seller_info['admin_seller_telegram_id'],
                                f"Вы перезакреплены в локацию № {location_id}")
-    except:
+    except Exception as err:
+        logging.error(err)
         await call.message.answer('Не далось отправить сообщение админу локации.')
     await call.message.answer(f'{seller_info["admin_seller_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
@@ -1765,6 +1798,7 @@ async def change_seller_location_by_id(message: types.Message, state: FSMContext
                              reply_markup=await generate_key_board_with_metro())
         await AddAdmin.ChangeSellerMetro.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1794,6 +1828,7 @@ async def change_seller_location(call: CallbackQuery, callback_data: dict, state
         await bot.send_message(seller_info['seller_telegram_id'],
                                f"Вы перезакреплены в локацию № {location_id}")
     except Exception as err:
+        logging.error(err)
         await call.message.answer('Не удалось отправить уведомление продавцу.')
     await call.message.answer(f'{seller_info["seller_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
@@ -1809,6 +1844,7 @@ async def change_courier_location_by_id(message: types.Message, state: FSMContex
                              reply_markup=await generate_key_board_with_metro())
         await AddAdmin.ChangeCourierMetro.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -1837,7 +1873,8 @@ async def change_courier_location(call: CallbackQuery, callback_data: dict, stat
     try:
         await bot.send_message(courier_info['courier_telegram_id'],
                                f"Вы перезакреплены в точку продаж № {location_id}")
-    except:
+    except Exception as err:
+        logging.error(err)
         await call.message.answer('Не удалось отправить уведомление курьеру.')
     await call.message.answer(f'{courier_info["courier_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
@@ -1904,6 +1941,7 @@ async def edit_item_by_id(message: types.Message, state: FSMContext):
                              reply_markup=await get_edit_item_markup(product_info))
         await AddAdmin.EditItemByWaitSubject.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Не получается отправить информацию о товаре\n'
                              'Если он был добавлен через базу данных, возможно, неправильно '
                              'заполнено поле product_photo_id',
@@ -2077,6 +2115,7 @@ async def get_new_item_prices(message: types.Message, state: FSMContext):
                              reply_markup=await get_edit_item_markup(product_info))
         await AddAdmin.EditItemByWaitSubject.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Попробуйте ввести цены еще раз.\n'
                              'Пример:\n'
                              '250, 240, 230, 220, 210, 205',
@@ -2335,6 +2374,7 @@ async def get_prices_for_new_size(message: types.Message, state: FSMContext):
                                  ]))
         await AddAdmin.EditItemBySizes.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Попробуйте ввести цены еще раз.\n'
                              'Пример:\n'
                              '250, 240, 230, 220, 210, 205',
@@ -2609,6 +2649,7 @@ async def get_new_size_prices(message: types.Message, state: FSMContext):
                              ]))
         await AddAdmin.EditItemEditSizeById.set()
     except Exception as err:
+        logging.error(err)
         await message.answer('Попробуйте ввести цены еще раз.\n'
                              'Пример:\n'
                              '250, 240, 230, 220, 210, 205',

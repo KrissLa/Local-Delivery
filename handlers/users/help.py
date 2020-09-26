@@ -10,7 +10,7 @@ from utils.misc import rate_limit
 
 @rate_limit(5, 'help')
 @dp.message_handler(CommandHelp(), IsAdminMessage(), state=states_for_menu)
-@dp.message_handler(CommandHelp(), IsAdminMessage())
+@dp.message_handler(CommandHelp(), IsAdminMessage(), state='*')
 async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
@@ -71,7 +71,7 @@ async def bot_help(message: types.Message, state: FSMContext):
 
 @rate_limit(5, 'help')
 @dp.message_handler(CommandHelp(), IsSellerAdminMessage(), state=states_for_menu)
-@dp.message_handler(CommandHelp(), IsSellerAdminMessage())
+@dp.message_handler(CommandHelp(), IsSellerAdminMessage(), state='*')
 async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
@@ -96,7 +96,7 @@ async def bot_help(message: types.Message, state: FSMContext):
 
 @rate_limit(5, 'help')
 @dp.message_handler(CommandHelp(), IsSellerMessage(), state=states_for_menu)
-@dp.message_handler(CommandHelp(), IsSellerMessage())
+@dp.message_handler(CommandHelp(), IsSellerMessage(), state='*')
 async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
@@ -119,7 +119,7 @@ async def bot_help(message: types.Message, state: FSMContext):
 
 @rate_limit(5, 'help')
 @dp.message_handler(CommandHelp(), IsCourierMessage(), state=states_for_menu)
-@dp.message_handler(CommandHelp(), IsCourierMessage())
+@dp.message_handler(CommandHelp(), IsCourierMessage(), state='*')
 async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
@@ -140,7 +140,7 @@ async def bot_help(message: types.Message, state: FSMContext):
 
 @rate_limit(5, 'help')
 @dp.message_handler(CommandHelp(), state=states_for_menu)
-@dp.message_handler(CommandHelp())
+@dp.message_handler(CommandHelp(), state='*')
 async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [

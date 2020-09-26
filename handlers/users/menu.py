@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -174,6 +176,7 @@ async def get_quantity_more_than_6(message: types.Message, state: FSMContext):
                                       f'{attention_em} Доставка работает в будни с 11 до 17',
                                  reply_markup=delivery_options_markup)
     except Exception as err:
+        logging.error(err)
         await message.answer("Пожалуйста, напишите количество товара (6 или больше)")
         if await state.get_state() == 'Menu:WaitQuantity6BackWithSize':
             await Menu.WaitQuantity6BackWithSize.set()

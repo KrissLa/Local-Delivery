@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -80,6 +82,7 @@ async def confirm_delivery_courier(call: CallbackQuery, callback_data: dict):
                                    f'Приятного аппетита!')
             await call.message.answer(f'Заказ № {order_id} доставлен!')
         except Exception as err:
+            logging.error(err)
             await call.message.answer(f'Не удалось отправить уведомление пользователю.\n'
                                       f'Заказ отмечен как доставлен.')
     else:

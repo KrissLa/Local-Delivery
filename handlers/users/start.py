@@ -1,3 +1,4 @@
+import logging
 from re import compile
 
 from aiogram import types
@@ -37,6 +38,7 @@ async def bot_start_referal(message: types.Message, state: FSMContext):
                                      reply_markup=await generate_keyboard_with_metro())
                 await SignUpUser.Metro.set()
         except Exception as err:
+            logging.error(err)
             await message.answer(f"Приветствуем! \n"
                                  f"Ваша реферальная ссылка недействительна."
                                  f"\nДля оформления заказа выберите ближайшую станцию метро.",

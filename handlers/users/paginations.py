@@ -48,7 +48,6 @@ async def get_location_pagination_list(call: CallbackQuery, callback_data: dict,
     data = await state.get_data()
     metro_id = data.get('new_local_object')['metro_id']
     page = int(callback_data.get('page'))
-    print(page)
     await call.message.edit_reply_markup(await generate_key_board_with_locations(metro_id, page))
 
 

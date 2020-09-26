@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import asyncpg
@@ -256,13 +257,13 @@ class Database:
            """
         try:
             await self.pool.execute("CREATE TYPE deliv_method AS ENUM ('С доставкой', 'Заберу сам');")
-        except asyncpg.exceptions.DuplicateObjectError:
-            print('Choices already exist')
+        except asyncpg.exceptions.DuplicateObjectError as err:
+            logging.error(err)
         try:
             await self.pool.execute(
                 "CREATE TYPE or_status AS ENUM ('Ожидание пользователя', 'Ожидание подтверждения продавца', 'Подтвержден, готовится', 'Отклонен', 'Заказ готов', 'Заказ доставлен/выдан');")
-        except asyncpg.exceptions.DuplicateObjectError:
-            print('Choices already exist')
+        except asyncpg.exceptions.DuplicateObjectError as err:
+            logging.error(err)
         await self.pool.execute(sql)
 
     async def create_table_temp_orders(self):
@@ -375,7 +376,9 @@ AND is_local_object_available = true ORDER BY metro_id""")
                     await self.pool.execute(sql, user_telegram_id, user_metro_id, user_location_id,
                                             user_local_object_id)
                     done = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count == 14:
+                        logging.error(err)
                     count += 1
         else:
             await self.pool.execute(
@@ -404,7 +407,9 @@ AND is_local_object_available = true ORDER BY metro_id""")
                     await self.pool.execute(sql, user_telegram_id, user_metro_id, user_location_id,
                                             user_local_object_id, inviter_id)
                     done = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count == 14:
+                        logging.error(err)
                     count += 1
 
         return
@@ -450,7 +455,6 @@ AND is_local_object_available = true ORDER BY metro_id""")
 		ORDER BY product_id;
         """
         products_list = await self.pool.fetch(sql)
-        print(products_list)
         for prod in products_list:
             if prod['price_1']:
                 prod_result.append(prod)
@@ -459,7 +463,6 @@ AND is_local_object_available = true ORDER BY metro_id""")
                     f"""SELECT EXISTS(SELECT size_id FROM product_sizes 
                             WHERE size_product_id = {prod['product_id']})"""
                 )
-                print(with_size)
                 if with_size:
                     prod_result.append(prod)
         return prod_result
@@ -515,7 +518,9 @@ AND is_local_object_available = true ORDER BY metro_id""")
                                         order_detail['product_name'], order_detail['product_price'],
                                         order_detail['quantity'], order_detail['order_price'])
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
 
     async def get_temp_orders(self, user_id):
@@ -539,7 +544,6 @@ AND is_local_object_available = true ORDER BY metro_id""")
         """Обновляем количество и цену после кнопки назад"""
         sql = f"""UPDATE temp_orders SET product_price = {product_price}, quantity = {quantity}, order_price = {order_price}
             WHERE temp_order_id = {order_id}"""
-        print(sql)
         await self.pool.execute(sql
 
                                 )
@@ -550,7 +554,6 @@ AND is_local_object_available = true ORDER BY metro_id""")
         sql = f"""UPDATE temp_orders SET product_price = {product_price}, quantity = {quantity}, 
             order_price = {order_price}, size_id = {size_id}, product_name = '{product_name}'
             WHERE temp_order_id = {order_id}"""
-        print(sql)
         await self.pool.execute(sql
 
                                 )
@@ -580,7 +583,9 @@ AND is_local_object_available = true ORDER BY metro_id""")
                                         order_local_object_id,
                                         order_local_object_name, delivery_method, order_info, order_price, order_status)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
 
     async def add_order_pickup(self,
@@ -609,7 +614,9 @@ AND is_local_object_available = true ORDER BY metro_id""")
                                         order_local_object_id, order_local_object_name, delivery_method,
                                         delivery_address, order_info, order_price, order_status)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
 
     async def get_user_address_data(self, user_id):
@@ -972,8 +979,8 @@ WHERE order_id = {order_id}"""
             try:
                 inviter_id = int(num_user_and_inviter_id['inviter_id'])
             except Exception as err:
+                logging.error(err)
                 inviter_id = None
-            print(inviter_id)
             if inviter_id:
                 num_orders_and_bonus = await self.pool.fetchrow(
                     f"SELECT number_of_referral_orders, bonus  FROM users "
@@ -981,17 +988,12 @@ WHERE order_id = {order_id}"""
                 )
                 num_ref_orders = num_orders_and_bonus['number_of_referral_orders']
                 bonus = num_orders_and_bonus['bonus']
-                print(bonus)
-                print(num_ref_orders)
                 if num_orders == 0:
                     bonus += 1
                 num_orders += 1
                 num_ref_orders += 1
                 if num_ref_orders % 10 == 0:
                     bonus += 1
-                print(bonus)
-                print(num_ref_orders)
-                print(num_orders)
                 await self.pool.execute(
                     f'UPDATE users SET number_of_orders = {num_orders} WHERE user_telegram_id = {user_id}'
                 )
@@ -1001,7 +1003,6 @@ WHERE order_id = {order_id}"""
                 )
             else:
                 num_orders += 1
-                print(num_orders)
                 await self.pool.execute(
                     f'UPDATE users SET number_of_orders = {num_orders} WHERE user_telegram_id = {user_id}'
                 )
@@ -1105,7 +1106,9 @@ WHERE order_id = {order_id}"""
                 await self.pool.execute(sql, bonus_order_user_telegram_id, bonus_location_id, bonus_quantity,
                                         bonus_order_status)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
 
     async def get_bonus_order_info(self, user_id):
@@ -1169,7 +1172,9 @@ WHERE order_id = {order_id}"""
             try:
                 await self.pool.execute(sql, admin_telegram_id, admin_name)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         return done
 
@@ -1187,7 +1192,9 @@ WHERE order_id = {order_id}"""
             try:
                 await self.pool.execute(sql, admin_telegram_id, admin_name)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         return done
 
@@ -1205,7 +1212,9 @@ WHERE order_id = {order_id}"""
             try:
                 await self.pool.execute(sql, telegram_id, name)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         return done
 
@@ -1223,7 +1232,9 @@ WHERE order_id = {order_id}"""
             try:
                 await self.pool.execute(sql, telegram_id, name)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         return done
 
@@ -1242,7 +1253,9 @@ WHERE order_id = {order_id}"""
             try:
                 await self.pool.execute(sql, admin_telegram_id, admin_name, metro_id, location_id)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         return done
 
@@ -1261,7 +1274,9 @@ WHERE order_id = {order_id}"""
             try:
                 await self.pool.execute(sql, telegram_id, name, metro_id, location_id)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         return done
 
@@ -1280,7 +1295,9 @@ WHERE order_id = {order_id}"""
             try:
                 await self.pool.execute(sql, telegram_id, name, metro_id, location_id)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         return done
 
@@ -1370,7 +1387,9 @@ WHERE order_id = {order_id}"""
             try:
                 await self.pool.execute(sql, metro_name)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
 
     async def get_all_metro(self):
@@ -1412,16 +1431,16 @@ WHERE order_id = {order_id}"""
                 await self.pool.execute(sql, new_location['location_name'], new_location['location_address'],
                                         new_location['metro_id'])
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         location_id = await self.pool.fetchval(
             "SELECT location_id FROM locations ORDER BY -location_id"
         )
-        print(location_id)
         category_ids = await self.pool.fetch(
             f"SELECT category_id FROM categories"
         )
-        print(category_ids)
         for category in category_ids:
             sql_category = """
                             INSERT INTO locations_categories (lc_location_id, lc_category_id) 
@@ -1435,13 +1454,14 @@ WHERE order_id = {order_id}"""
                 try:
                     await self.pool.execute(sql_category, location_id, category['category_id'])
                     done_cat = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count_cat == 14:
+                        logging.error(err)
                     count_cat += 1
 
         product_ids = await self.pool.fetch(
             f"SELECT product_id FROM products"
         )
-        print(product_ids)
         for product in product_ids:
             sql_category = """
                             INSERT INTO locations_products (lp_location_id, lp_product_id) 
@@ -1455,12 +1475,13 @@ WHERE order_id = {order_id}"""
                 try:
                     await self.pool.execute(sql_category, location_id, product['product_id'])
                     done_cat = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count_cat == 14:
+                        logging.error(err)
                     count_cat += 1
         product_size_ids = await self.pool.fetch(
             f"SELECT size_id FROM product_sizes"
         )
-        print(product_size_ids)
         for size_id in product_size_ids:
             sql_category = """
                                     INSERT INTO locations_product_sizes (lps_location_id, lps_size_product_id) 
@@ -1474,7 +1495,9 @@ WHERE order_id = {order_id}"""
                 try:
                     await self.pool.execute(sql_category, location_id, size_id['size_id'])
                     done_cat = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count_cat == 14:
+                        logging.error(err)
                     count_cat += 1
 
     async def get_list_of_locations(self):
@@ -1631,7 +1654,9 @@ WHERE lc_category_id = {category_id} AND lc_location_id={location_id}"""
                 await self.pool.execute(sql, local_object_name, local_object_info['location_id'],
                                         local_object_info['metro_id'])
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
 
     async def get_local_objects_list(self):
@@ -1695,7 +1720,9 @@ ORDER BY product_id"""
             try:
                 await self.pool.execute(sql, category_name)
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         category_id = await self.pool.fetchval(
             f"SELECT category_id FROM categories ORDER BY -category_id"
@@ -1716,7 +1743,9 @@ ORDER BY product_id"""
                 try:
                     await self.pool.execute(sql_category, location['location_id'], category_id)
                     done_cat = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count_cat == 14:
+                        logging.error(err)
                     count_cat += 1
 
     async def get_category_name_by_id(self, category_id):
@@ -1749,7 +1778,9 @@ ORDER BY product_id"""
                                         product_data['prices']['price5'],
                                         product_data['prices']['price6'])
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         product_id = await self.pool.fetchval(
             f"SELECT product_id FROM products ORDER BY -product_id"
@@ -1770,7 +1801,9 @@ ORDER BY product_id"""
                 try:
                     await self.pool.execute(sql_category, location['location_id'], product_id)
                     done_cat = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count_cat == 14:
+                        logging.error(err)
                     count_cat += 1
 
     async def add_product_with_size(self, product_data):
@@ -1790,7 +1823,9 @@ ORDER BY product_id"""
                                         product_data['item_description'],
                                         product_data['photo_id'])
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         product_id = await self.pool.fetchval(
             f"SELECT product_id FROM products ORDER BY -product_id"
@@ -1811,7 +1846,9 @@ ORDER BY product_id"""
                 try:
                     await self.pool.execute(sql_category, location['location_id'], product_id)
                     done_cat = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count_cat == 14:
+                        logging.error(err)
                     count_cat += 1
         return product_id
 
@@ -1837,7 +1874,9 @@ ORDER BY product_id"""
                                         prices['price5'],
                                         prices['price6'])
                 done = True
-            except asyncpg.exceptions.UniqueViolationError:
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
                 count += 1
         size_id = await self.pool.fetchval(
             f"SELECT size_id FROM product_sizes ORDER BY -size_id"
@@ -1858,7 +1897,9 @@ ORDER BY product_id"""
                 try:
                     await self.pool.execute(sql_category, location['location_id'], size_id)
                     done_cat = True
-                except asyncpg.exceptions.UniqueViolationError:
+                except asyncpg.exceptions.UniqueViolationError as err:
+                    if count_cat == 14:
+                        logging.error(err)
                     count_cat += 1
 
     async def get_product_info(self, product_id):

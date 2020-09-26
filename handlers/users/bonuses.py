@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -126,6 +128,7 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
                 await state.finish()
 
     except Exception as err:
+        logging.error(err)
         await message.answer('Напишите количество.\n'
                              f"Вам доступно - {count_bonus} шт.",
                              reply_markup=back_cancel_bonus_markup)

@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
@@ -185,6 +187,7 @@ async def get_seller_telegram_id(message: types.Message, state: FSMContext):
             await message.answer('Продавец с таким id уже добавлен')
             await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Не получается добавить пользователя. Возможно, он не отправил боту сообщение.'
                              'Попробуйте еще раз.',
                              reply_markup=cancel_admin_markup)
@@ -206,6 +209,7 @@ async def remove_seller_by_id(message: types.Message, state: FSMContext):
             await message.answer('Вы не можете удалить продавца из другой локации')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -242,6 +246,7 @@ async def get_courier_telegram_id(message: types.Message, state: FSMContext):
             await message.answer('Курьер с таким id уже добавлен')
             await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Не получается добавить пользователя. Возможно, он не отправил боту сообщение.'
                              'Попробуйте еще раз.',
                              reply_markup=cancel_admin_markup)
@@ -263,6 +268,7 @@ async def remove_courier_by_id(message: types.Message, state: FSMContext):
             await message.answer('Вы не можете удалить курьера из другой локации')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -280,6 +286,7 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
                              'Чтобы вернуть в продажу введите /return_category_to_stock')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -297,6 +304,7 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
                              'Чтобы убрать из продажи введите /remove_category_from_stock')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -332,6 +340,7 @@ async def remove_item_from_stock_by_id(message: types.Message, state: FSMContext
                              'Чтобы вернуть в продажу введите /return_item_to_stock')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
@@ -367,6 +376,7 @@ async def return_item_to_stock_by_id(message: types.Message, state: FSMContext):
                              'Чтобы убрать из продажи введите /remove_item_from_stock')
         await state.finish()
     except Exception as err:
+        logging.error(err)
         await message.answer('Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 

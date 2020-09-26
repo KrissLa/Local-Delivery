@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 
 from aiogram import types
@@ -205,6 +206,7 @@ async def seller_confirms_order(call: CallbackQuery, callback_data: dict):
                                           f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
                                           f'Не забудьте отметить готовность заказа. Найти его можно в /active_orders')
             except Exception as err:
+                logging.error(err)
                 await call.message.answer(f'Не удалось отправить подтверждение пользователю.'
                                           f'Заказ № {order_id} подтвержден!\n'
                                           f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
@@ -238,6 +240,7 @@ async def select_courier(call: CallbackQuery, callback_data: dict, state: FSMCon
         await call.message.answer("Уведомления курьеру и клиенту отправлены."
                                   'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
     except Exception as err:
+        logging.error(err)
         await call.message.answer("Не удалось отправить уведомление пользователю"
                                   "Уведомление курьеру отправлено."
                                   'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
