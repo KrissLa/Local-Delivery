@@ -13,6 +13,7 @@ from keyboards.inline.inline_keyboards import generate_couriers_keyboard, genera
     generate_active_bonus_order_keyboard
 from loader import dp, db, bot
 from states.sellers_states import SelectCourier
+from utils.check_states import reset_state
 from utils.send_messages import send_message_to_courier_order, \
     send_confirm_message_to_user_pickup, send_confirm_message_to_user_delivery
 
@@ -29,6 +30,160 @@ async def im_at_home(message: types.Message):
     """Ставим статус дома"""
     await db.im_at_work_seller(message.from_user.id, 'false')
     await message.answer('Теперь Вы не будете получать заказы')
+
+
+@dp.message_handler(IsSellerMessage(), commands=['active_orders'], state=["*"])
+async def get_active_orders(message: types.Message, state: FSMContext):
+    """Показать список всех принятых заказов"""
+    await reset_state(state, message)
+    location_id = await db.get_seller_location_id(message.from_user.id)
+    order_list = await db.get_active_orders_by_location_id(location_id)
+    if order_list:
+        for order in order_list:
+            if order['delivery_method'] == 'С доставкой':
+                await message.answer(text=f'Заказ № {order["order_id"]}\n'
+                                          f'{order["order_info"]}\n'
+                                          f'C доставкой\n'
+                                          f'Доставить к {order["deliver_to"].strftime("%H:%M")}',
+                                     reply_markup=await generate_active_order_keyboard(order))
+            else:
+                await message.answer(text=f'Заказ № {order["order_id"]}\n'
+                                          f'{order["order_info"]}\n'
+                                          'Самовывоз\n'
+                                          f'Приготовить к {order["deliver_to"].strftime("%H:%M")}',
+                                     reply_markup=await generate_active_order_keyboard(order))
+    else:
+        await message.answer('Нет принятых заказов')
+
+
+# Список заказов, ожидающих принятия
+@dp.message_handler(IsSellerMessage(), commands=['unaccepted_orders'], state=["*"])
+async def get_active_orders(message: types.Message, state: FSMContext):
+    """Показать список всех непринятых заказов"""
+    await reset_state(state, message)
+    location_id = await db.get_seller_location_id(message.from_user.id)
+    order_list = await db.get_unaccepted_orders_by_location_id(location_id)
+    if order_list:
+        for order in order_list:
+            if order['delivery_method'] == "С доставкой":
+                mes = f"""Новый заказ № {order['order_id']}
+    {order['order_info']}
+Тип доставки: {order['delivery_method']}
+Адрес доставки: {order["order_local_object_name"]},
+{order["delivery_address"]}
+Время заказа: {order['order_created_at'].strftime("%Y-%m-%d %H:%M")}
+Доставить через {order["time_for_delivery"]} минут
+Пропуск для курьеров: {order["order_pass_for_courier"]}
+Цена заказа: {order["order_price"]} руб.
+Статус заказа: {order["order_status"]}"""
+            else:
+                mes = f"""
+Новый заказ № {order['order_id']}
+    {order['order_info']}
+Тип доставки: {order['delivery_method']}
+{order["delivery_address"]}
+Время заказа: {order['order_created_at'].strftime("%Y-%m-%d %H:%M")}
+Приготовить через {order["time_for_delivery"]} минут
+Цена заказа: {order["order_price"]} руб.
+Статус заказа: {order["order_status"]}"""
+            await message.answer(mes,
+                                 reply_markup=InlineKeyboardMarkup(
+                                     inline_keyboard=[
+                                         [
+                                             InlineKeyboardButton(
+                                                 text=f'Принять заказ № {order["order_id"]}',
+                                                 callback_data=confirm_order_seller_data.new(
+                                                     order_id=order["order_id"],
+                                                     status='confirm',
+                                                     delivery_method=order['delivery_method'])
+                                             )
+                                         ],
+                                         [
+                                             InlineKeyboardButton(
+                                                 text=f'Отклонить заказ № {order["order_id"]}',
+                                                 callback_data=confirm_order_seller_data.new(
+                                                     order_id=order["order_id"],
+                                                     status='cancel',
+                                                     delivery_method=order['delivery_method'])
+                                             )
+                                         ]
+
+                                     ]
+                                 )
+                                 )
+    else:
+        await message.answer("Нет непринятых заказов")
+
+
+# список заказов, с кнопкой подтверждения о выдаче заказа на кассе
+
+@dp.message_handler(IsSellerMessage(), commands=['confirm_delivery'], state=['*'])
+async def confirm_delivery_seller(message: types.Message, state: FSMContext):
+    """Подтверждение выдачи товара продавцом"""
+    await reset_state(state, message)
+    location_id = await db.get_seller_location_id(message.from_user.id)
+    sellers_confirm_orders = await db.get_all_ready_orders_for_sellers(location_id)
+    if sellers_confirm_orders:
+        for order in sellers_confirm_orders:
+            await message.answer(f'Заказ № {order["order_id"]}.\n'
+                                 f'{order["order_info"]}'
+                                 f'Приготовить в {order["deliver_to"].strftime("%H:%M")}\n'
+                                 f'Статус заказ: {order["order_status"]}\n'
+                                 f'Стоимость заказа: {order["order_price"]} руб',
+                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                     [
+                                         InlineKeyboardButton(
+                                             text='Заказ выдан!',
+                                             callback_data=order_is_delivered.new(order_id=order["order_id"],
+                                                                                  user_id=order[
+                                                                                      'order_user_telegram_id'])
+                                         )
+                                     ]
+                                 ]))
+    else:
+        await message.answer('Пока нет готовых к выдаче заказов.')
+
+
+@dp.message_handler(IsSellerMessage(), commands=['confirm_readiness_bonus_orders'], state=['*'])
+async def set_ready_bonus_orders(message: types.Message, state: FSMContext):
+    """Получаем список ативных бонусных заказов"""
+    await reset_state(state, message)
+    location_id = await db.get_seller_location_id(message.from_user.id)
+    order_list = await db.get_active_bonus_orders_by_location_id(location_id)
+    if order_list:
+        for order in order_list:
+            await message.answer(text=f'Заказ № {order["bonus_order_id"]}Б\n'
+                                      f'Количество бонусных роллов - {order["bonus_quantity"]} шт.\n',
+                                 reply_markup=await generate_active_bonus_order_keyboard(order))
+    else:
+        await message.answer('Пока нет бонусных заказов')
+
+
+@dp.message_handler(IsSellerMessage(), commands=['confirm_bonus_orders'], state=['*'])
+async def bonus_orders_to_confirm_delivery(message: types.Message, state: FSMContext):
+    """Список бонусных заказов к выдаче"""
+    await reset_state(state, message)
+    location_id = await db.get_seller_location_id(message.from_user.id)
+    order_list = await db.get_ready_bonus_orders_by_location_id(location_id)
+    if order_list:
+        for order in order_list:
+            await message.answer(f'Бонусный заказ № {order["bonus_order_id"]}Б.\n'
+                                 f'Количество бонусных роллов - {order["bonus_quantity"]} шт.',
+                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                     [
+                                         InlineKeyboardButton(
+                                             text='Заказ выдан!',
+                                             callback_data=bonus_order_is_delivered_data.new(
+                                                 order_id=order["bonus_order_id"],
+                                                 user_id=order[
+                                                     'bonus_order_user_telegram_id'])
+                                         )
+                                     ]
+                                 ]))
+    else:
+        await message.answer('Пока нет готовых к выдаче бонусных заказов.')
+
+
 
 
 @dp.callback_query_handler(confirm_order_seller_data.filter(status='confirm'), state=['*'])
@@ -84,7 +239,7 @@ async def select_courier(call: CallbackQuery, callback_data: dict, state: FSMCon
                                   'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
     except Exception as err:
         await call.message.answer("Не удалось отправить уведомление пользователю"
-                                  "Уведомления курьеру отправлено."
+                                  "Уведомление курьеру отправлено."
                                   'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
     await state.finish()
 
@@ -115,29 +270,6 @@ async def get_reason(message: types.Message, state: FSMContext):
                                     f'Причина: {reason}')
     await message.answer("Заказ отклонен. Пользователь получил уведомление.")
     await state.finish()
-
-
-@dp.message_handler(IsSellerMessage(), commands=['active_orders'], state=["*"])
-async def get_active_orders(message: types.Message):
-    """Показать список всех принятых заказов"""
-    location_id = await db.get_seller_location_id(message.from_user.id)
-    order_list = await db.get_active_orders_by_location_id(location_id)
-    if order_list:
-        for order in order_list:
-            if order['delivery_method'] == 'С доставкой':
-                await message.answer(text=f'Заказ № {order["order_id"]}\n'
-                                          f'{order["order_info"]}\n'
-                                          f'C доставкой\n'
-                                          f'Доставить к {order["deliver_to"].strftime("%H:%M")}',
-                                     reply_markup=await generate_active_order_keyboard(order))
-            else:
-                await message.answer(text=f'Заказ № {order["order_id"]}\n'
-                                          f'{order["order_info"]}\n'
-                                          'Самовывоз\n'
-                                          f'Приготовить к {order["deliver_to"].strftime("%H:%M")}',
-                                     reply_markup=await generate_active_order_keyboard(order))
-    else:
-        await message.answer('Нет принятых заказов')
 
 
 @dp.callback_query_handler(active_order_data.filter(delivery_method='С доставкой'))
@@ -184,90 +316,6 @@ async def order_ready(call: CallbackQuery, callback_data: dict):
         await call.message.answer("Заказ уже обработан.")
 
 
-# Список заказов, ожидающих принятия
-@dp.message_handler(IsSellerMessage(), commands=['unaccepted_orders'], state=["*"])
-async def get_active_orders(message: types.Message):
-    """Показать список всех непринятых заказов"""
-    location_id = await db.get_seller_location_id(message.from_user.id)
-    order_list = await db.get_unaccepted_orders_by_location_id(location_id)
-    if order_list:
-        for order in order_list:
-            if order['delivery_method'] == "С доставкой":
-                mes = f"""Новый заказ № {order['order_id']}
-            {order['order_info']}
-            Тип доставки: {order['delivery_method']}
-            Адрес доставки: {order["order_local_object_name"]},
-            {order["delivery_address"]}
-            Доставить через {order["time_for_delivery"]} минут
-            Пропуск для курьеров: {order["order_pass_for_courier"]}
-            Цена заказа: {order["order_price"]} руб.
-            Статус заказа: {order["order_status"]}"""
-            else:
-                mes = f"""
-            Новый заказ № {order['order_id']}
-            {order['order_info']}
-            Тип доставки: {order['delivery_method']}
-            {order["delivery_address"]}
-            Приготовить через {order["time_for_delivery"]} минут
-            Цена заказа: {order["order_price"]} руб.
-            Статус заказа: {order["order_status"]}"""
-            await message.answer(mes,
-                                 reply_markup=InlineKeyboardMarkup(
-                                     inline_keyboard=[
-                                         [
-                                             InlineKeyboardButton(
-                                                 text=f'Принять заказ № {order["order_id"]}',
-                                                 callback_data=confirm_order_seller_data.new(
-                                                     order_id=order["order_id"],
-                                                     status='confirm',
-                                                     delivery_method=order['delivery_method'])
-                                             )
-                                         ],
-                                         [
-                                             InlineKeyboardButton(
-                                                 text=f'Отклонить заказ № {order["order_id"]}',
-                                                 callback_data=confirm_order_seller_data.new(
-                                                     order_id=order["order_id"],
-                                                     status='cancel',
-                                                     delivery_method=order['delivery_method'])
-                                             )
-                                         ]
-
-                                     ]
-                                 )
-                                 )
-    else:
-        await message.answer("Нет непринятых заказов")
-
-
-# список заказов, с кнопкой подтверждения о выдаче заказа на кассе
-
-@dp.message_handler(IsSellerMessage(), commands=['confirm_delivery'], state=['*'])
-async def confirm_delivery_seller(message: types.Message):
-    """Подтверждение выдачи товара продавцом"""
-    location_id = await db.get_seller_location_id(message.from_user.id)
-    sellers_confirm_orders = await db.get_all_ready_orders_for_sellers(location_id)
-    if sellers_confirm_orders:
-        for order in sellers_confirm_orders:
-            await message.answer(f'Заказ № {order["order_id"]}.\n'
-                                 f'{order["order_info"]}'
-                                 f'Приготовить в {order["deliver_to"].strftime("%H:%M")}\n'
-                                 f'Статус заказ: {order["order_status"]}\n'
-                                 f'Стоимость заказа: {order["order_price"]} руб',
-                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                     [
-                                         InlineKeyboardButton(
-                                             text='Заказ выдан!',
-                                             callback_data=order_is_delivered.new(order_id=order["order_id"],
-                                                                                  user_id=order[
-                                                                                      'order_user_telegram_id'])
-                                         )
-                                     ]
-                                 ]))
-    else:
-        await message.answer('Пока нет готовых к выдаче заказов.')
-
-
 @dp.callback_query_handler(IsSellerCallback(), order_is_delivered.filter())
 async def confirm_delivery_courier(call: CallbackQuery, callback_data: dict):
     """Продавец подтверждает выдачу"""
@@ -299,25 +347,11 @@ async def confirm_bonus_order_seller(call: CallbackQuery, callback_data: dict):
         bonus_order_info = await db.get_bonus_order_info_by_id(b_order_id)
         await bot.send_message(chat_id=bonus_order_info['bonus_order_user_telegram_id'],
                                text=f"Ваш бонусный заказ № {bonus_order_info['bonus_order_id']}Б подтвержден.\n"
-                                    f"Когда он будет готов Вам придет уведомление.\n")
-        await call.message.answer(f'Бонусный заказ № {bonus_order_info["bonus_order_id"]}Б подтвержден\n'
-                                  f'Когда он будет готов, сообщите клиенту: /confirm_readiness_bonus_orders')
+                                    f"Когда он будет готов, Вам придет уведомление.\n")
+        await call.message.answer(f'Бонусный заказ № {bonus_order_info["bonus_order_id"]}Б подтвержден.\n'
+                                  f'Когда он будет готов сообщите клиенту: /confirm_readiness_bonus_orders')
     else:
         await call.message.answer('Заказ уже обработан')
-
-
-@dp.message_handler(IsSellerMessage(), commands=['confirm_readiness_bonus_orders'], state=['*'])
-async def set_ready_bonus_orders(message: types.Message):
-    """Получаем список ативных бонусных заказов"""
-    location_id = await db.get_seller_location_id(message.from_user.id)
-    order_list = await db.get_active_bonus_orders_by_location_id(location_id)
-    if order_list:
-        for order in order_list:
-            await message.answer(text=f'Заказ № {order["bonus_order_id"]}Б\n'
-                                      f'Количество бонусных роллов - {order["bonus_quantity"]} шт.\n',
-                                 reply_markup=await generate_active_bonus_order_keyboard(order))
-    else:
-        await message.answer('Пока нет бонусных заказов')
 
 
 @dp.callback_query_handler(active_bonus_order_data.filter(), state=['*'])
@@ -332,30 +366,6 @@ async def confirm_readiness_bonus(call: CallbackQuery, callback_data: dict):
                            f"Подойдите к продавцу чтобы забрать его.")
     await call.message.answer(
         "Уведомление клиенту отправлено! После выдачи заказа отметьте его в /confirm_bonus_orders")
-
-
-@dp.message_handler(IsSellerMessage(), commands=['confirm_bonus_orders'], state=['*'])
-async def bonus_orders_to_confirm_delivery(message: types.Message):
-    """Список бонусных заказов к выдаче"""
-    location_id = await db.get_seller_location_id(message.from_user.id)
-    order_list = await db.get_ready_bonus_orders_by_location_id(location_id)
-    if order_list:
-        for order in order_list:
-            await message.answer(f'Бонусный заказ № {order["bonus_order_id"]}Б.\n'
-                                 f'Количество бонусных роллов - {order["bonus_quantity"]} шт.',
-                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                     [
-                                         InlineKeyboardButton(
-                                             text='Заказ выдан!',
-                                             callback_data=bonus_order_is_delivered_data.new(
-                                                 order_id=order["bonus_order_id"],
-                                                 user_id=order[
-                                                     'bonus_order_user_telegram_id'])
-                                         )
-                                     ]
-                                 ]))
-    else:
-        await message.answer('Пока нет готовых к выдаче бонусных заказов.')
 
 
 @dp.callback_query_handler(bonus_order_is_delivered_data.filter(), state=['*'])

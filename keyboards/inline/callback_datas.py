@@ -61,3 +61,5 @@ edit_size_data = CallbackData('edit_size', 'size_id', 'subject')
 page_call_data = CallbackData('next', 'page')
 
 back_data = CallbackData('back', 'page')
+
+remove_from_cart_data = CallbackData('remove_fc', 'order_id')

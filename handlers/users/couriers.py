@@ -5,6 +5,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQu
 from filters.users_filters import IsCourierCallback, IsCourierMessage
 from keyboards.inline.callback_datas import order_is_delivered
 from loader import dp, db, bot
+from utils.check_states import reset_state
 
 
 @dp.message_handler(IsCourierMessage(), commands=['im_at_work'], state=['*'])
@@ -24,7 +25,7 @@ async def im_at_home(message: types.Message):
 @dp.message_handler(IsCourierMessage(), commands=['all_ready_orders'], state=["*"])
 async def get_active_orders(message: types.Message, state: FSMContext):
     """Показать список всех заказов, готовых к доставке"""
-    await state.finish()
+    await reset_state(state, message)
     all_waitings_orders = await db.get_all_ready_orders_for_courier(message.from_user.id)
     if all_waitings_orders:
         for order in all_waitings_orders:
@@ -51,7 +52,7 @@ async def get_active_orders(message: types.Message, state: FSMContext):
 @dp.message_handler(IsCourierMessage(), commands=['my_orders'], state=['*'])
 async def get_my_orders(message: types.Message, state: FSMContext):
     """Список заказов закрепленных за курьером"""
-    await state.finish()
+    await reset_state(state, message)
     couriers_orders = await db.get_all_waiting_orders_for_courier(message.from_user.id)
     if couriers_orders:
         await message.answer('Вам назначены следующие заказы:')

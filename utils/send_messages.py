@@ -1,7 +1,24 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from keyboards.inline.callback_datas import confirm_order_seller_data, confirm_bonus_order
+from keyboards.inline.callback_datas import confirm_order_seller_data, confirm_bonus_order, remove_from_cart_data
 from loader import bot
+
+
+async def send_cart(orders, user_id):
+    """Отправяем корзину"""
+    num = 1
+    for order in orders:
+        await bot.send_message(user_id, f'   {num}. {order["product_name"]} - {order["quantity"]} шт. '
+                                        f'{order["order_price"]} руб.\n',
+                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                   [
+                                       InlineKeyboardButton(
+                                           text=f'Убрать из корзины товар {num}',
+                                           callback_data=remove_from_cart_data.new(order_id=order['temp_order_id'])
+                                       )
+                                   ]
+                               ]))
+        num += 1
 
 
 async def send_message_to_sellers_bonus(sellers_list, order_info):

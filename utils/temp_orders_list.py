@@ -6,7 +6,7 @@ async def get_temp_orders_list_message(orders):
     mes = ''
     num = 1
     for order in orders:
-        mes += f'   {num}. {order["product_name"]} - {order["quantity"]} шт\n'
+        mes += f'   {num}. {order["product_name"]} - {order["quantity"]} шт. {order["order_price"]} руб.\n'
         num += 1
     return mes
 

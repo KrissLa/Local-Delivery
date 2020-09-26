@@ -755,6 +755,18 @@ AND is_local_object_available = true ORDER BY metro_id""")
                 AND temp_order_id = {order_id}"""
         )
 
+    async def delete_order_by_id(self, order_id):
+        """Удаляем заказ"""
+        await self.pool.execute(
+            f"""DELETE FROM orders WHERE order_id = {order_id}"""
+        )
+
+    async def delete_temp_order_by_id(self, order_id):
+        """Удаляем заказ"""
+        await self.pool.execute(
+            f"""DELETE FROM temp_orders WHERE temp_order_id = {order_id}"""
+        )
+
     async def clear_empty_orders(self, user_id):
         """Очищаем корзину пользователя"""
         await self.pool.execute(

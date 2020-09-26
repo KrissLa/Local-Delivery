@@ -27,19 +27,19 @@ async def bot_start_referal(message: types.Message, state: FSMContext):
                 await state.update_data(inviter_id=deep_link_args)
                 await message.answer(f"Приветствуем! \n"
                                      f"Ваш реферальный код принят!"
-                                     f"\nДля оформления заказа выберите ближайшее метро.",
+                                     f"\nДля оформления заказа выберите ближайшую станцию метро.",
                                      reply_markup=await generate_keyboard_with_metro())
                 await SignUpUser.Metro.set()
             else:
                 await message.answer(f"Приветствуем! \n"
                                      f"Ваша реферальная ссылка недействительна."
-                                     f"\nДля оформления заказа выберите ближайшее метро.",
+                                     f"\nДля оформления заказа выберите ближайшую станцию метро.",
                                      reply_markup=await generate_keyboard_with_metro())
                 await SignUpUser.Metro.set()
         except Exception as err:
             await message.answer(f"Приветствуем! \n"
                                  f"Ваша реферальная ссылка недействительна."
-                                 f"\nДля оформления заказа выберите ближайшее метро.",
+                                 f"\nДля оформления заказа выберите ближайшую станцию метро.",
                                  reply_markup=await generate_keyboard_with_metro())
             await SignUpUser.Metro.set()
 
@@ -55,7 +55,7 @@ async def bot_start(message: types.Message):
         await message.answer('Вы уже зарегистрированы в боте. Пожалуйста, воспользуйтесь командами из меню.',
                              reply_markup=menu_keyboard)
     else:
-        await message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшее метро.",
+        await message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшую станцию метро.",
                              reply_markup=await generate_keyboard_with_metro())
         await SignUpUser.Metro.set()
 
@@ -68,7 +68,7 @@ async def get_user_location(call: CallbackQuery, callback_data: dict, state: FSM
     metro_id = int(callback_data.get('metro_id'))
     await state.update_data(metro_id=metro_id)
     metro_name = await db.get_metro_name_by_metro_id(metro_id)
-    await call.message.answer(f"Вы выбрали {metro_name} \n"
+    await call.message.answer(f"Вы выбрали {metro_name}. \n"
                               f"Выберите объект локальной доставки",
                               reply_markup=await get_available_local_objects(metro_id))
     await SignUpUser.Location.set()
@@ -77,7 +77,7 @@ async def get_user_location(call: CallbackQuery, callback_data: dict, state: FSM
 @dp.callback_query_handler(text='back', state=SignUpUser.Location)
 async def none_location_list(call: CallbackQuery):
     await call.message.edit_reply_markup()
-    await call.message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшее метро.",
+    await call.message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшую станцию метро.",
                               reply_markup=await generate_keyboard_with_metro())
     await SignUpUser.Metro.set()
 

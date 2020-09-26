@@ -687,6 +687,12 @@ cart_markup = InlineKeyboardMarkup(
     inline_keyboard=[
         [
             InlineKeyboardButton(
+                text='В меню продолжить покупки',
+                callback_data='to_menu_one_more_product'
+            )
+        ],
+        [
+            InlineKeyboardButton(
                 text='С доставкой',
                 callback_data='delivery_option_delivery'
             )
@@ -717,6 +723,12 @@ one_more_product_markup = InlineKeyboardMarkup(
 
 delivery_options_markup = InlineKeyboardMarkup(
     inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text='В меню продолжить покупки',
+                callback_data='to_menu_one_more_product'
+            )
+        ],
         [
             InlineKeyboardButton(
                 text='С доставкой',

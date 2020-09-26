@@ -6,13 +6,14 @@ from keyboards.inline.callback_datas import categories_data, product_list_data, 
     product_count_price_data, need_pass_data, deliver_to_time_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_categories, generate_keyboard_with_products, \
     generate_keyboard_with_count_and_prices, generate_keyboard_with_sizes, \
-    generate_keyboard_with_count_and_prices_for_size, one_more_product_markup, delivery_options_markup, \
+    generate_keyboard_with_count_and_prices_for_size, delivery_options_markup, \
     order_cancel_or_back_markup, need_pass_markup, \
     build_keyboard_with_time, confirm_order_markup, generate_keyboard_with_none_categories, \
     generate_keyboard_with_none_products
 from loader import dp, db, bot
 from states.menu_states import Menu
-from utils.send_messages import send_message_to_sellers
+from utils.emoji import attention_em
+from utils.send_messages import send_message_to_sellers, send_cart
 from utils.temp_orders_list import get_temp_orders_list_message, get_final_price, get_couriers_list
 
 
@@ -28,19 +29,6 @@ async def one_more_product(call: CallbackQuery, state: FSMContext):
     else:
         await call.message.answer('Нет доступных категорий.',
                                   reply_markup=await generate_keyboard_with_none_categories())
-    await Menu.WaitCategory.set()
-
-
-@dp.message_handler(text="Меню")
-async def send_categories_menu(message: types.Message):
-    """Отправляем категории товаров, доступные в локации пользователя"""
-    categories = await db.get_categories_for_user_location_id(message.from_user.id)
-    if categories:
-        await message.answer('Выберите категорию меню',
-                             reply_markup=await generate_keyboard_with_categories(categories))
-    else:
-        await message.answer('Нет доступных категорий.',
-                             reply_markup=await generate_keyboard_with_none_categories())
     await Menu.WaitCategory.set()
 
 
@@ -175,15 +163,15 @@ async def get_quantity_more_than_6(message: types.Message, state: FSMContext):
                 await db.add_temp_order(message.from_user.id, order_data['order_detail'])
             temp_orders = await db.get_temp_orders(message.from_user.id)
             await Menu.OneMoreOrNext.set()
-            list_products = await get_temp_orders_list_message(temp_orders)
+
+            await send_cart(temp_orders, message.from_user.id)
             final_price = await get_final_price(temp_orders)
+            list_products = await get_temp_orders_list_message(temp_orders)
             await state.update_data(list_products=list_products)
             await state.update_data(final_price=final_price)
-            await message.answer(text=f'Вы выбрали:\n{list_products}')
-            await message.answer(f'Сумма заказа - {final_price} руб.',
-                                 reply_markup=one_more_product_markup)
-            await message.answer(text='Оформить заказ\n'
-                                      'i Доставка работает в будни с 11 до 17',
+            await message.answer(text=f'Сумма заказа - {final_price} руб.\n'
+                                      'Оформить заказ\n'
+                                      f'{attention_em} Доставка работает в будни с 11 до 17',
                                  reply_markup=delivery_options_markup)
     except Exception as err:
         await message.answer("Пожалуйста, напишите количество товара (6 или больше)")
@@ -227,11 +215,10 @@ async def set_quantity(call: CallbackQuery, callback_data: dict, state: FSMConte
     final_price = await get_final_price(temp_orders)
     await state.update_data(list_products=list_products)
     await state.update_data(final_price=final_price)
-    await call.message.answer(text=f'Вы выбрали:\n{list_products}')
-    await call.message.answer(f'Сумма заказа - {final_price} руб.',
-                              reply_markup=one_more_product_markup)
-    await call.message.answer(text='Оформить заказ\n'
-                                   'i Доставка работает в будни с 11 до 17',
+    await send_cart(temp_orders, call.from_user.id)
+    await call.message.answer(text=f'Сумма заказа - {final_price} руб.\n'
+                                   'Оформить заказ\n'
+                                   f'{attention_em} Доставка работает в будни с 11 до 17',
                               reply_markup=delivery_options_markup)
 
 
@@ -335,7 +322,7 @@ async def use_previous_address(call: CallbackQuery, state: FSMContext):
                                   f'Один из них доставит Вам заказ',
                                   reply_markup=need_pass_markup)
     else:
-        await call.message.answer(f'Внимание! Закажите гостевой пропуск для курьеров в случае необходимости.\n'
+        await call.message.answer(f'Внимание! Закажите гостевой пропуск для курьера в случае необходимости.\n'
                                   f'ФИО курьера: Отправим после подтверждения заказа\n',
                                   reply_markup=need_pass_markup)
     await Menu.WaitPass.set()
@@ -359,7 +346,7 @@ async def get_user_address(message: types.Message):
                              f'Один из них доставит Вам заказ',
                              reply_markup=need_pass_markup)
     else:
-        await message.answer(f'Внимание! Закажите гостевой пропуск для курьеров в случае необходимости.\n'
+        await message.answer(f'Внимание! Закажите гостевой пропуск для курьера в случае необходимости.\n'
                              f'ФИО курьера: Отправим после подтверждения заказа\n',
                              reply_markup=need_pass_markup)
     await Menu.WaitPass.set()
@@ -387,7 +374,7 @@ async def is_pass_need(call: CallbackQuery, callback_data: dict):
                               f'{order_data["delivery_address"]}\n'
                               f'{order_pass_value}\n'
                               f'Сумма заказа - {order_data["order_price"]} руб.')
-    await call.message.answer('Выберите время через которое необходимо доставить Ваш заказ:',
+    await call.message.answer('Выберите время, через которое необходимо доставить Ваш заказ:',
                               reply_markup=await build_keyboard_with_time('delivery', 'back_to_pass'))
     await Menu.WaitTime.set()
 
@@ -436,7 +423,7 @@ async def user_confirm_order(call: CallbackQuery, state: FSMContext):
                                   f"Статус: {order_data['order_status']}\n")
         await state.finish()
     else:
-        await call.message.answer(f"Простите. Не нашел доступных продавцов.\n"
+        await call.message.answer(f"Извините. Не нашел доступных продавцов.\n"
                                   f"Ваши товары помещены в корзину: /cart\n"
                                   f"Если Вы считаете что произошла ошибка, пожалуйста свяжитесь с нами.")
 

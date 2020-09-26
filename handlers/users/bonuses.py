@@ -9,50 +9,6 @@ from states.bonus_state import Bonus
 from utils.send_messages import send_message_to_sellers_bonus
 
 
-@dp.message_handler(text="Акции и бонусы")
-async def send_categories_menu(message: types.Message):
-    """Нажатие на кнопку акции и бонусы"""
-    data = await db.get_bonus_and_location_address(message.from_user.id)
-    bot_user = await dp.bot.get_me()
-    if data['bonus'] == 0:
-        await message.answer("Ваш бонусный баланс:\n"
-                             f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n")
-    else:
-        await message.answer("Ваш бонусный баланс:\n"
-                             f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n"
-                             f"Подойдите к продавцу и нажмите Получить\n"
-                             f"Ближайтей адрес: {data['location_address']}",
-                             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                 [
-                                     InlineKeyboardButton(
-                                         text='Получить',
-                                         callback_data=bonuses_data.new(count_bonus=data['bonus'])
-                                     )
-                                 ]
-                             ]))
-
-    await message.answer(f'Пригласите друга и после первого заказа мы подарим Вам 1 ролл на Ваш выбор.\n'
-                         f'\n'
-                         f'Мы также будем дарить Вам по 1 роллу с каждого 10 заказа любого из Ваших друзей.\n\n'
-                         f'! Промо акция действует бессрочно и только при заказе через данный сервисный бот.\n\n'
-                         f'Ваша реферальная ссылка:\n'
-                         f'http://t.me/{bot_user.username}?start={message.from_user.id}',
-                         reply_markup=InlineKeyboardMarkup(
-                             inline_keyboard=[
-                                 [
-                                     InlineKeyboardButton(
-                                         text='Показать в QR code',
-                                         callback_data='show_qr_ref_link'
-                                     ),
-                                     InlineKeyboardButton(
-                                         text='Поделиться',
-                                         switch_inline_query='share'
-                                     )
-                                 ]
-                             ]
-                         ))
-
-
 @dp.callback_query_handler(text='cancel_bonus_order', state=Bonus.Count)
 @dp.callback_query_handler(text='back', state=Bonus.Count)
 async def back_to_bonus(call: CallbackQuery, state: FSMContext):
@@ -68,7 +24,7 @@ async def back_to_bonus(call: CallbackQuery, state: FSMContext):
         await call.message.answer("Ваш бонусный баланс:\n"
                                   f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n"
                                   f"Подойдите к продавцу и нажмите Получить\n"
-                                  f"Ближайтей адрес: {data['location_address']}",
+                                  f"Ближайший адрес: {data['location_address']}",
                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                       [
                                           InlineKeyboardButton(

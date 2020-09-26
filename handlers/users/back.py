@@ -1,15 +1,16 @@
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 
-from keyboards.inline.callback_datas import back_to_product_list_data, back_to_product_from_sizes_list_data, \
-    back_to_size_from_price_list_data
+from keyboards.inline.callback_datas import back_to_product_list_data, back_to_size_from_price_list_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_categories, generate_keyboard_with_products, \
     generate_keyboard_with_sizes, generate_keyboard_with_count_and_prices, \
-    generate_keyboard_with_count_and_prices_for_size, one_more_product_markup, delivery_options_markup, \
+    generate_keyboard_with_count_and_prices_for_size, delivery_options_markup, \
     need_pass_markup, build_keyboard_with_time, generate_keyboard_with_none_categories, \
     generate_keyboard_with_none_products
 from loader import dp, db, bot
 from states.menu_states import Menu
+from utils.emoji import attention_em
+from utils.send_messages import send_cart
 from utils.temp_orders_list import get_temp_orders_list_message, get_final_price, get_couriers_list
 
 
@@ -128,15 +129,14 @@ async def back_to_one_more_or_next(call: CallbackQuery, state: FSMContext):
     """Возврат к меню выбора способа доставки"""
     await call.message.edit_reply_markup()
     temp_orders = await db.get_temp_orders(call.from_user.id)
-    list_products = await get_temp_orders_list_message(temp_orders)
+    await send_cart(temp_orders, call.from_user.id)
     final_price = await get_final_price(temp_orders)
+    list_products = await get_temp_orders_list_message(temp_orders)
     await state.update_data(list_products=list_products)
     await state.update_data(final_price=final_price)
-    await call.message.answer(text=f'Вы выбрали:\n{list_products}')
-    await call.message.answer(f'Сумма заказа - {final_price} руб.',
-                              reply_markup=one_more_product_markup)
-    await call.message.answer(text='Оформить заказ\n'
-                                   'i Доставка работает в будни с 11 до 17',
+    await call.message.answer(text=f'Сумма заказа - {final_price} руб.\n'
+                                   'Оформить заказ\n'
+                                   f'{attention_em} Доставка работает в будни с 11 до 17',
                               reply_markup=delivery_options_markup)
     await Menu.OneMoreOrNext.set()
 
