@@ -2156,9 +2156,8 @@ ORDER BY product_category_id;"""
         return await self.pool.fetch(
             f"""SELECT order_id, deliver_to, delivery_method, order_info, order_price, order_status
 FROM orders WHERE order_user_telegram_id={user_id}
-AND order_status = 'Ожидание подтверждения продавца'
-OR order_status='Подтвержден, готовится' 
-OR order_status='Заказ готов'
+AND order_status != 'Ожидание пользователя'
+AND order_status != 'Заказ доставлен/выдан'
 ORDER BY order_id"""
         )
 
