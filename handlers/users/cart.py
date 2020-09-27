@@ -77,7 +77,7 @@ async def get_order_status(message: types.Message):
                     await message.answer(f"Заказ № {order['order_id']}\n"
                                          f"{order['order_info']}"
                                          f"Стоимость: {order['order_price']}\n"
-                                         f"Будет готов в {order['deliver_to'].strftime('%H:%M')}\n"
+                                         f"Будет доставлен в {order['deliver_to'].strftime('%H:%M')}\n"
                                          f"Статус заказа - {order['order_status']}\n\n")
                 else:
                     await message.answer(f"Заказ № {order['order_id']}\n"
@@ -89,7 +89,7 @@ async def get_order_status(message: types.Message):
                     await message.answer(f"Заказ № {order['order_id']}\n"
                                          f"{order['order_info']}"
                                          f"Стоимость: {order['order_price']}\n"
-                                         f"Будет доставлен в {order['deliver_to'].strftime('%H:%M')}\n"
+                                         f"Будет готов в {order['deliver_to'].strftime('%H:%M')}\n"
                                          f"Статус заказа - {order['order_status']}\n\n")
                 else:
                     await message.answer(f"Заказ № {order['order_id']}\n"
