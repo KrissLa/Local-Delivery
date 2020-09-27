@@ -62,7 +62,6 @@ async def back_to_bonus(call: CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(text='show_qr_ref_link')
 async def show_qr_ref_code(call: CallbackQuery):
     """Генерируем qr code"""
-    await call.message.edit_reply_markup()
     bot_user = await dp.bot.get_me()
 
     await bot.send_photo(chat_id=call.from_user.id,
