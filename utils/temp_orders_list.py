@@ -184,6 +184,28 @@ async def get_list_of_products_for_return_to_stock(products):
     return mes
 
 
+async def get_list_of_delivery_products_for_return_to_stock(products):
+    """Формируем список продуктов для временного снятия с продажи"""
+    mes = ''
+
+    for prod in products:
+        category = f"""{prod['delivery_product_id']}. {prod['delivery_product_name']}
+Чтобы вернуть в продажу нажмите /return_delivery_item_to_stock_by_id_{prod['delivery_product_id']}\n\n"""
+        mes += category
+    return mes
+
+
+async def get_list_of_delivery_products_for_edit(products):
+    """Формируем список продуктов для временного снятия с продажи"""
+    mes = ''
+
+    for prod in products:
+        category = f"""{prod['delivery_product_id']}. {prod['delivery_product_name']}
+Чтобы изменить цену нажмите /edit_delivery_item_price_by_id_{prod['delivery_product_id']}\n\n"""
+        mes += category
+    return mes
+
+
 async def get_list_of_products_for_edit(products):
     """Формируем список продуктов для изменения"""
     mes = ''

@@ -65,7 +65,38 @@ states_for_menu = [ProfileState.WaitAddress,
                    AddAdmin.EditItemByAvailability,
                    AddAdmin.EditItemBySizes,
                    AddAdmin.EditItemEditSizeById,
-                   Bonus.Count]
+                   Bonus.Count,
+                   AddAdmin.EditDeliveryItem,
+                   AddAdmin.EditDeliveryItemID,
+                   AddAdmin.EditDeliveryItemPrice,
+                   AddAdmin.ReturnDeliveryItemToStockCategory,
+                   AddAdmin.ReturnDeliveryItemToStockProduct,
+                   AddAdmin.RemoveDeliveryItemFromStockCategory,
+                   AddAdmin.RemoveDeliveryItemFromStockProduct,
+                   AddAdmin.RemoveDeliveryItemCat,
+                   AddAdmin.RemoveDeliveryItem,
+                   AddAdmin.RemoveDeliveryCategory,
+                   AddAdmin.TakeOrders,
+                   AddAdmin.TakeOrdersWait,
+                   AddAdmin.DeliveryCategoryName,
+                   AddAdmin.DeliveryItemCategory,
+                   AddAdmin.DeliveryItemName,
+                   AddAdmin.DeliveryItemPrice,
+                   SellerAdmin.ChangeOrder,
+                   SellerAdmin.DeliveryCategory,
+                   SellerAdmin.ChangeDeliveryDate,
+                   SellerAdmin.WaitCancelConfirm,
+                   SellerAdmin.ChangeDeliveryTime,
+                   SellerAdmin.ChangeDeliveryConfirm,
+                   SellerAdmin.ChangeDeliveryWaitConfirm,
+                   SellerAdmin.DeliveryProduct,
+                   SellerAdmin.DeliveryQuantity,
+                   SellerAdmin.DeliveryQuantity6,
+                   SellerAdmin.ConfirmTempOrder,
+                   SellerAdmin.ConfirmTempOrderRemoved,
+                   SellerAdmin.DeliveryDate,
+                   SellerAdmin.DeliveryTime,
+                   SellerAdmin.ConfirmOrder]
 
 
 async def reset_state(state, message):
@@ -96,8 +127,26 @@ async def reset_state(state, message):
                                    'AddAdmin:EditMetro', 'AddAdmin:EditItem',
                                    'AddAdmin:EditItemByWaitSubject', 'AddAdmin:EditItemByAvailability',
                                    'AddAdmin:EditItemBySizes', 'AddAdmin:EditItemEditSizeById',
-                                   'Bonus:Count']:
+                                   'Bonus:Count', 'AddAdmin:EditDeliveryItem', 'AddAdmin:EditDeliveryItemID',
+                                   'AddAdmin:EditDeliveryItemPrice', 'AddAdmin:ReturnDeliveryItemToStockCategory',
+                                   'AddAdmin:ReturnDeliveryItemToStockProduct',
+                                   'AddAdmin:RemoveDeliveryItemFromStockCategory',
+                                   'AddAdmin:RemoveDeliveryItemFromStockProduct', 'AddAdmin:RemoveDeliveryItemCat',
+                                   'AddAdmin:RemoveDeliveryItem', 'AddAdmin.RemoveDeliveryCategory',
+                                   'AddAdmin:TakeOrders', 'AddAdmin:TakeOrdersWait', 'AddAdmin:DeliveryCategoryName',
+                                   'AddAdmin:DeliveryItemCategory', 'AddAdmin:DeliveryItemName',
+                                   'AddAdmin:DeliveryItemPrice', 'SellerAdmin:ChangeOrder',
+                                   'SellerAdmin:ChangeDeliveryDate',
+                                   'SellerAdmin:WaitCancelConfirm', 'SellerAdmin:ChangeDeliveryTime',
+                                   'SellerAdmin:ChangeDeliveryConfirm', 'SellerAdmin:ChangeDeliveryWaitConfirm',]:
         await state.finish()
+    elif await state.get_state() in ['SellerAdmin:DeliveryCategory', 'SellerAdmin:DeliveryProduct',
+                                     'SellerAdmin:DeliveryQuantity', 'SellerAdmin:DeliveryQuantity6',
+                                     'SellerAdmin:ConfirmTempOrder', 'SellerAdmin:ConfirmTempOrderRemoved',
+                                     'SellerAdmin:DeliveryDate', 'SellerAdmin:DeliveryTime',
+                                     'SellerAdmin:ConfirmOrder']:
+        await state.finish()
+        await db.delete_temp_delivery_order_by_user_id(message.from_user.id)
     elif await state.get_state() in ['Menu:WaitTime', 'Menu:WaitUserConfirmationDelivery',
                                      'Menu:WaitUserConfirmationPickup', 'Menu:WaitPass',
                                      'Menu:WaitAddress']:

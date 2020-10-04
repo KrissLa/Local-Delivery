@@ -147,3 +147,11 @@ class AddAdmin(StatesGroup):
     RemoveDeliveryItemFromStockCategory = State()
     RemoveDeliveryItemFromStockProduct = State()
 
+    ReturnDeliveryItemToStockCategory = State()
+    ReturnDeliveryItemToStockProduct = State()
+
+    EditDeliveryItem = State()
+    EditDeliveryItemPrice = State()
+    EditDeliveryItemID = State()
+
+

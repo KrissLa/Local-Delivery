@@ -64,7 +64,22 @@ async def bot_help(message: types.Message, state: FSMContext):
         '37. Редактировать товар - /edit_item\n',
         'Работа с пользователями:',
         '38. Заблокировать пользователя - /ban_user',
-        '39. Разблокировать пользователя - /unban_user',
+        '39. Разблокировать пользователя - /unban_user\n',
+        'Работа с оптовыми товарами:',
+        '40. Добавить новую категорию для оптовых поставок - /add_delivery_category',
+        '41. Добавить новый товар для оптовых поставок - /add_delivery_item',
+        '42. Изменить цену товара для оптовых поставок - /edit_delivery_item_price\n',
+        '43. Удалить категорию для оптовых поставок - /remove_delivery_category',
+        '44. Удалить товар для оптовых поставок - /remove_delivery_item\n',
+        '45. Убрать товар для оптовых поставок из меню - /remove_delivery_item_from_stock',
+        '46. Вернуть товар для оптовых поставок в меню - /return_delivery_item_to_stock\n',
+
+        'Работа с оптовыми заказами:',
+        '40. Принять новые или измененные заказы - /take_orders',
+        '40. Подтвердить доставку заказа - /confirm_delivery',
+
+
+
     ]
     await message.answer('\n'.join(text))
 
@@ -90,7 +105,7 @@ async def bot_help(message: types.Message, state: FSMContext):
         '10. Вернуть категорию в меню - /return_category_to_stock',
         '11. Убрать товар из меню - /remove_item_from_stock',
         '12. Вернуть товар в меню - /return_item_to_stock\n',
-        'Работа с оптовыми заказами',
+        'Работа с оптовыми заказами:',
         '13. Создать новый заказ на поставку - /new_delivery_order',
         '14. Посмотреть/изменить/отменить заказы на поставку - /change_delivery_order',
     ]

@@ -1773,6 +1773,12 @@ WHERE lc_category_id = {category_id} AND lc_location_id={location_id}"""
             f"""UPDATE products SET is_product_available=true WHERE product_id = {product_id}"""
         )
 
+    async def return_to_stock_delivery_item(self, product_id):
+        """Возвращаем в продажу товар"""
+        await self.pool.execute(
+            f"""UPDATE delivery_products SET is_de_product_available=true WHERE delivery_product_id = {product_id}"""
+        )
+
     async def add_local_object(self, local_object_name, local_object_info):
         """Добавляем объект локальной доставки"""
         sql = """
@@ -2136,6 +2142,15 @@ JOIN products ON product_category_id=category_id
 WHERE is_product_available = false ORDER BY category_id"""
         )
 
+    async def get_category_for_admin_delivery(self):
+        """Выбираем все категории, в которых есть снятые с продажи товары"""
+        return await self.pool.fetch(
+            f"""SELECT DISTINCT delivery_category_id, delivery_category_name 
+    FROM delivery_categories
+    JOIN delivery_products ON delivery_product_category_id=delivery_category_id
+    WHERE is_de_product_available = false ORDER BY delivery_category_id"""
+            )
+
     async def get_category_for_remove_item_from_stock(self):
         """Выбираем все категории, в которых есть товары в продаже"""
         return await self.pool.fetch(
@@ -2173,6 +2188,14 @@ WHERE product_category_id = {category_id} AND is_product_available = true ORDER 
         return await self.pool.fetch(
             f"""SELECT product_id, product_name FROM products
     WHERE product_category_id = {category_id} AND is_product_available = false ORDER BY product_id"""
+        )
+
+    async def get_delivery_products_for_return_to_stock(self, category_id):
+        """Выбираем товары из категории"""
+        return await self.pool.fetch(
+            f"""SELECT delivery_product_id, delivery_product_name FROM delivery_products
+    WHERE delivery_product_category_id = {category_id} AND is_de_product_available = false 
+ORDER BY delivery_product_id"""
         )
 
     async def change_seller_admin_location(self, seller_admin_id, metro_id, location_id):
@@ -2473,6 +2496,15 @@ AND is_de_product_available = true
 order by delivery_category_id;"""
         )
 
+    async def get_delivery_categories_with_products(self):
+        """Получаем список доступных категорий"""
+        return await self.pool.fetch(
+            f"""SELECT DISTINCT delivery_category_id, delivery_category_name 
+    FROM delivery_categories
+    JOIN delivery_products ON delivery_product_category_id = delivery_category_id
+    order by delivery_category_id;"""
+            )
+
     async def get_delivery_products(self, category_id):
         """Получаем товары из категории"""
         return await self.pool.fetch(
@@ -2486,6 +2518,12 @@ order by delivery_category_id;"""
         """Получаем название товара по id"""
         return await self.pool.fetchval(
             f"""SELECT delivery_product_name FROM delivery_products WHERE delivery_product_id = {product_id}"""
+        )
+
+    async def get_delivery_product_by_id(self, product_id):
+        """Получаем название товара по id"""
+        return await self.pool.fetchrow(
+            f"""SELECT * FROM delivery_products WHERE delivery_product_id = {product_id}"""
         )
 
     async def add_temp_delivery_order(self, user_id, order_detail):
@@ -2664,3 +2702,9 @@ SELECT delivery_order_status FROM delivery_orders WHERE delivery_order_id = {ord
         """Меняем статус"""
         await self.pool.execute(f"""UPDATE delivery_orders SET delivery_order_status = '{status}'
 WHERE delivery_order_id = {order_id}""")
+
+    async def update_delivery_product_price(self, item_id, price):
+        """Меняем цену"""
+        await self.pool.execute(f"""UPDATE delivery_products 
+SET delivery_price = '{price}'
+    WHERE delivery_product_id = {item_id}""")
