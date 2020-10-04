@@ -21,3 +21,23 @@ class SellerAdmin(StatesGroup):
 
     ReturnItemToStockCategory = State()
     ReturnItemToStockProduct = State()
+
+    DeliveryCategory = State()
+    DeliveryProduct = State()
+    DeliveryQuantity = State()
+    DeliveryQuantity6 = State()
+    ConfirmTempOrder = State()
+    ConfirmTempOrderRemoved = State()
+    DeliveryDate = State()
+    DeliveryTime = State()
+    ConfirmOrder = State()
+
+    ChangeOrder = State()
+
+    ChangeDeliveryDate = State()
+    ChangeDeliveryTime = State()
+    ChangeDeliveryConfirm = State()
+    ChangeDeliveryWaitConfirm = State()
+
+    WaitCancelConfirm = State()
+

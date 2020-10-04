@@ -12,6 +12,7 @@ from keyboards.inline.callback_datas import metro_data, local_object_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_metro, get_available_local_objects
 from loader import dp, db
 from states.menu_states import SignUpUser
+from utils.emoji import attention_em
 
 
 @dp.message_handler(CommandStart(deep_link=compile(r'\d\w*')), state=['*'])
@@ -112,8 +113,8 @@ async def set_user_location(call: CallbackQuery, callback_data: dict, state: FSM
     await call.message.answer(f'Все готово!\n'
                               f'Мы сохранили Ваш выбор {loc_data["local_object_name"]}.\n'
                               f'Теперь Вы можете заказывать еду и напитки из нашего меню с доставкой к Вам на работу.\n'
-                              f'Вы всегда можете изменить эти настройки в Вашем профиле.\n'
+                              f'{attention_em} Вы всегда можете изменить эти настройки в Вашем профиле.\n'
                               f'Ваша ссылка для приглашения друзей:\n'
                               f'http://t.me/{bot_user.username}?start={call.from_user.id}\n'
-                              f'Подробнее о реферальной системе можно узнать в разделе "Акции и бонусы".',
+                              f'{attention_em} Подробнее о реферальной системе можно узнать в разделе "Акции и бонусы".',
                               reply_markup=menu_keyboard)

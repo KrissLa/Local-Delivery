@@ -4,7 +4,7 @@ from aiogram.types import CallbackQuery
 
 from keyboards.default.menu import menu_keyboard
 from keyboards.inline.callback_datas import remove_from_cart_data
-from keyboards.inline.inline_keyboards import cart_markup
+from keyboards.inline.inline_keyboards import cart_markup, cancel_order_by_use_button
 from loader import dp, db
 from states.menu_states import Menu
 from utils.emoji import attention_em
@@ -78,23 +78,27 @@ async def get_order_status(message: types.Message):
                                          f"{order['order_info']}"
                                          f"Стоимость: {order['order_price']}\n"
                                          f"Будет доставлен в {order['deliver_to'].strftime('%H:%M')}\n"
-                                         f"Статус заказа - {order['order_status']}\n\n")
+                                         f"Статус заказа - {order['order_status']}\n\n",
+                                         reply_markup=await cancel_order_by_use_button(order['order_id']))
                 else:
                     await message.answer(f"Заказ № {order['order_id']}\n"
                                          f"{order['order_info']}\n"
                                          f"Стоимость: {order['order_price']}\n"
-                                         f"Статус заказа - {order['order_status']}\n\n")
+                                         f"Статус заказа - {order['order_status']}\n\n",
+                                         reply_markup=await cancel_order_by_use_button(order['order_id']))
             else:
                 if order['deliver_to']:
                     await message.answer(f"Заказ № {order['order_id']}\n"
                                          f"{order['order_info']}"
                                          f"Стоимость: {order['order_price']}\n"
                                          f"Будет готов в {order['deliver_to'].strftime('%H:%M')}\n"
-                                         f"Статус заказа - {order['order_status']}\n\n")
+                                         f"Статус заказа - {order['order_status']}\n\n",
+                                         reply_markup=await cancel_order_by_use_button(order['order_id']))
                 else:
                     await message.answer(f"Заказ № {order['order_id']}\n"
                                          f"{order['order_info']}"
                                          f"Стоимость: {order['order_price']}\n"
-                                         f"Статус заказа - {order['order_status']}\n\n")
+                                         f"Статус заказа - {order['order_status']}\n\n",
+                                         reply_markup=await cancel_order_by_use_button(order['order_id']))
     else:
         await message.answer('Нет активных заказов')

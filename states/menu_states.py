@@ -36,6 +36,7 @@ class Menu(StatesGroup):
     WaitQuantityBackWithSize = State()
 
     WaitAddress = State()
+    WaitNewAddress = State()
     WaitPass = State()
     WaitTime = State()
 

@@ -10,6 +10,7 @@ from keyboards.inline.inline_keyboards import generate_keyboard_with_categories,
 from loader import db, dp
 from states.menu_states import Menu, SignUpUser
 from utils.check_states import states_for_menu, reset_state
+from utils.emoji import warning_em, error_em, attention_em
 from utils.temp_orders_list import get_objects_list_message
 
 
@@ -67,7 +68,7 @@ async def send_categories_menu(message: types.Message, state: FSMContext):
                                       f"\n"
                                       f"User ID: {user_info['user_telegram_id']}\n"
                                       f"Адрес доставки: {user_info['local_object_name']}\n"
-                                      f"Параметры доставки: Не указаны",
+                                      f"{warning_em} Параметры доставки: Не указаны",
                                  reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                      [
                                          InlineKeyboardButton(
@@ -78,7 +79,7 @@ async def send_categories_menu(message: types.Message, state: FSMContext):
                                  ]))
     except Exception as err:
         logging.error(err)
-        await message.answer(f"Сначала нужно выбрать ближайшую станцию метро и точку продаж",
+        await message.answer(f"{error_em} Сначала нужно выбрать ближайшую станцию метро и точку продаж",
                              reply_markup=await generate_keyboard_with_metro())
         await SignUpUser.Metro.set()
 
@@ -110,7 +111,7 @@ async def send_categories_menu(message: types.Message, state: FSMContext):
     await message.answer(f'Пригласите друга и после первого заказа мы подарим Вам 1 ролл на Ваш выбор.\n'
                          f'\n'
                          f'Мы также будем дарить Вам по 1 роллу с каждого 10 заказа любого из Ваших друзей.\n\n'
-                         f'! Промо акция действует бессрочно и только при заказе через данный сервисный бот.\n\n'
+                         f'{attention_em} Промо акция действует бессрочно и только при заказе через данный сервисный бот.\n\n'
                          f'Ваша реферальная ссылка:\n'
                          f'http://t.me/{bot_user.username}?start={message.from_user.id}',
                          reply_markup=InlineKeyboardMarkup(

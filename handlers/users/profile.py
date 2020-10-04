@@ -6,6 +6,7 @@ from keyboards.inline.callback_datas import metro_data, local_object_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_metro_profile, get_available_local_objects_profile
 from loader import dp, db
 from states.profile_states import ProfileState
+from utils.emoji import warning_em
 
 
 @dp.callback_query_handler(text='cancel', state=[ProfileState.WaitMetro,
@@ -34,7 +35,7 @@ async def send_categories_menu(call: CallbackQuery, state: FSMContext):
                                        f"\n"
                                        f"User ID: {user_info['user_telegram_id']}\n"
                                        f"Адрес доставки: {user_info['local_object_name']}\n"
-                                       f"Параметры доставки: Не указаны",
+                                       f"{warning_em} Параметры доставки: Не указаны",
                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                       [
                                           InlineKeyboardButton(

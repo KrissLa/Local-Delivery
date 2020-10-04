@@ -1,5 +1,13 @@
-from loader import db
+import logging
 
+from loader import db
+from pytz import timezone
+from datetime import datetime, timedelta
+
+from utils.emoji import attention_em, warning_em
+
+
+weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 
 async def get_temp_orders_list_message(orders):
     """Формируем список покупок за сеанс"""
@@ -7,6 +15,25 @@ async def get_temp_orders_list_message(orders):
     num = 1
     for order in orders:
         mes += f'   {num}. {order["product_name"]} - {order["quantity"]} шт. {order["order_price"]} руб.\n'
+        num += 1
+    return mes
+
+
+async def get_temp_delivery_orders_list_message(orders):
+    """Формируем список покупок за сеанс"""
+    mes = ''
+    num = 1
+    for order in orders:
+        items = order["delivery_quantity"] * 12
+        digit = int(str(order["delivery_quantity"])[-1])
+        if digit == 1 and order["delivery_quantity"] != 11:
+            tray = 'лоток'
+        elif digit in [2, 3, 4] and order["delivery_quantity"] not in [12, 13, 14]:
+            tray = 'лотка'
+        else:
+            tray = 'лотков'
+        mes += f'   {num}. {order["delivery_product_name"]} -\n    {order["delivery_quantity"]} ' \
+               f'{tray} ({items} шт.) {order["delivery_order_price"]} руб.\n\n'
         num += 1
     return mes
 
@@ -26,6 +53,14 @@ async def get_final_price(orders):
     fin_price = 0
     for order in orders:
         fin_price += order['order_price']
+    return int(fin_price)
+
+
+async def get_final_delivery_price(orders):
+    """Считаем окончательную цену"""
+    fin_price = 0
+    for order in orders:
+        fin_price += order['delivery_order_price']
     return int(fin_price)
 
 
@@ -77,6 +112,19 @@ async def get_list_of_category(category_list):
     return mes
 
 
+async def get_list_of_delivery_category(category_list):
+    """Формируем список локаций для удаления"""
+    mes = ''
+
+    for cat in category_list:
+        count_products = await db.get_count_products_delivery(cat['delivery_category_id'])
+        category = f"""{cat['delivery_category_id']}. {cat['delivery_category_name']}
+Количество товаров в категории: {count_products}
+Чтобы удалить нажмите /remove_delivery_category_by_id_{cat['delivery_category_id']}\n\n"""
+        mes += category
+    return mes
+
+
 async def get_list_of_category_for_remove_from_stock(category_list):
     """Формируем список локаций для временного снятия с продажи"""
     mes = ''
@@ -110,6 +158,17 @@ async def get_list_of_products_for_remove_from_stock(products):
     for prod in products:
         category = f"""{prod['product_id']}. {prod['product_name']}
 Чтобы убрать из продажи нажмите /remove_item_from_stock_by_id_{prod['product_id']}\n\n"""
+        mes += category
+    return mes
+
+
+async def get_list_of_delivery_products_for_remove_from_stock(products):
+    """Формируем список продуктов для временного снятия с продажи"""
+    mes = ''
+
+    for prod in products:
+        category = f"""{prod['delivery_product_id']}. {prod['delivery_product_name']}
+Чтобы убрать из продажи нажмите /remove_delivery_item_from_stock_by_id_{prod['delivery_product_id']}\n\n"""
         mes += category
     return mes
 
@@ -324,6 +383,17 @@ async def get_list_of_products(products_list):
     return mes
 
 
+async def get_list_of_delivery_products(products_list):
+    """Формируем список локаций для удаления"""
+    mes = ''
+
+    for prod in products_list:
+        product = f"""{prod['delivery_product_id']}. {prod['delivery_product_name']}
+Чтобы удалить нажмите /remove_delivery_item_by_id_{prod['delivery_product_id']}\n\n"""
+        mes += product
+    return mes
+
+
 async def get_sizes(sizes_list):
     """Формируем список размеров"""
     mes = ''
@@ -358,3 +428,47 @@ async def get_sizes_for_edit(sizes_list):
 Чтобы изменить введите /edit_size_by_id_{size['size_id']}\n"""
         mes += size
     return mes
+
+
+async def get_formatted_date(day, delta):
+    """Форматируем дату"""
+    date = (day + timedelta(days=delta)).strftime("%d.%m.%Y")
+    weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+    weekday = (day + timedelta(days=delta)).weekday()
+    result = {
+        'num': weekday,
+        'day': weekdays[weekday],
+        'date': date
+    }
+    return result
+
+
+async def get_list_of_delivery_orders(orders):
+    """Формируем список активных заказов"""
+    mes = ''
+    for ord in orders:
+        order = f"""Заказ № {ord['delivery_order_id']}. 
+{ord['delivery_order_info']}
+Сумма заказа: {ord['delivery_order_price']} руб.
+Дата доставки {ord['day_for_delivery'].strftime("%d.%m.%Y")} {weekdays[ord['day_for_delivery'].weekday()]}
+Время доставки {ord['delivery_time_info']}
+{warning_em} Вы можете изменить дату и время доставки заказа не позднее, чем за 3 часа до доставки.
+{warning_em} Отменить заказ можно не позднее, чем за 12 часов до доставки.
+{warning_em} Внимание! После изменения даты/времени доставки, заказ отменить будет нельзя.
+{attention_em} Чтобы изменить или отменить заказ нажмите /change_delivery_order_by_id_{ord['delivery_order_id']}\n\n"""
+        mes += order
+    return mes
+
+
+async def get_delivery_order_info_message(order_data):
+    """формируем сообщение"""
+    return f"""
+Номер заказа: № {order_data['delivery_order_id']}
+Адрес доставки: {order_data['location_name']}, 
+{order_data['location_address']}
+    {order_data['delivery_order_info']}
+Стоимость заказа: {order_data['delivery_order_price']} руб.
+Дата доставки: {order_data['day_for_delivery'].strftime("%d.%m.%Y")} {weekdays[order_data['day_for_delivery'].weekday()]}
+Время доставки: {order_data['delivery_time_info']}
+Статус заказа: {order_data['delivery_order_status']}
+"""

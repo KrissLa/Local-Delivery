@@ -8,20 +8,21 @@ from filters.users_filters import IsCourierCallback, IsCourierMessage
 from keyboards.inline.callback_datas import order_is_delivered
 from loader import dp, db, bot
 from utils.check_states import reset_state
+from utils.emoji import success_em, error_em
 
 
 @dp.message_handler(IsCourierMessage(), commands=['im_at_work'], state=['*'])
 async def im_at_work(message: types.Message):
     """Ставим статус на работе"""
     await db.im_at_work_courier(message.from_user.id, 'true')
-    await message.answer('Теперь Вы будете получать заказы')
+    await message.answer(f'{success_em} Теперь Вы будете получать заказы')
 
 
 @dp.message_handler(IsCourierMessage(), commands=['im_at_home'], state=['*'])
 async def im_at_home(message: types.Message):
     """Ставим статус дома"""
     await db.im_at_work_courier(message.from_user.id, 'false')
-    await message.answer('Теперь Вы не будете получать заказы')
+    await message.answer(f'{error_em} Теперь Вы не будете получать заказы')
 
 
 @dp.message_handler(IsCourierMessage(), commands=['all_ready_orders'], state=["*"])
@@ -80,7 +81,7 @@ async def confirm_delivery_courier(call: CallbackQuery, callback_data: dict):
             await bot.send_message(user_id,
                                    f'Ваш заказ № {order_id} доставлен.\n'
                                    f'Приятного аппетита!')
-            await call.message.answer(f'Заказ № {order_id} доставлен!')
+            await call.message.answer(f'{success_em} Заказ № {order_id} доставлен!')
         except Exception as err:
             logging.error(err)
             await call.message.answer(f'Не удалось отправить уведомление пользователю.\n'

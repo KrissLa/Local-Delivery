@@ -23,6 +23,33 @@ async def send_cart(orders, user_id):
         num += 1
 
 
+async def send_delivery_cart(orders, user_id):
+    """Отправяем корзину"""
+    num = 1
+    for order in orders:
+        items = order["delivery_quantity"] * 12
+        digit = int(str(order["delivery_quantity"])[-1])
+        if digit == 1 and order["delivery_quantity"] != 11:
+            tray = 'лоток'
+        elif digit in [2, 3, 4] and order["delivery_quantity"] not in [12, 13, 14]:
+            tray = 'лотка'
+        else:
+            tray = 'лотков'
+
+        await bot.send_message(user_id, f'{num}. {order["delivery_product_name"]} -\n{order["delivery_quantity"]} '
+                                        f'{tray} ({items} шт.) {order["delivery_order_price"]} руб.\n',
+                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                   [
+                                       InlineKeyboardButton(
+                                           text=f'Убрать товар {num}',
+                                           callback_data=remove_from_cart_data.new(
+                                               order_id=order['temp_delivery_order_id'])
+                                       )
+                                   ]
+                               ]))
+        num += 1
+
+
 async def send_message_to_sellers_bonus(sellers_list, order_info):
     """Отправляем сообщение продавцам"""
     message = f"""Новый бонусный заказ № {order_info['bonus_order_id']}!

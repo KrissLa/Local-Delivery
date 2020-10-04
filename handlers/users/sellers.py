@@ -15,6 +15,7 @@ from keyboards.inline.inline_keyboards import generate_couriers_keyboard, genera
 from loader import dp, db, bot
 from states.sellers_states import SelectCourier
 from utils.check_states import reset_state
+from utils.emoji import success_em, error_em, warning_em, attention_em
 from utils.send_messages import send_message_to_courier_order, \
     send_confirm_message_to_user_pickup, send_confirm_message_to_user_delivery
 
@@ -23,14 +24,14 @@ from utils.send_messages import send_message_to_courier_order, \
 async def im_at_work(message: types.Message):
     """Ставим статус на работе"""
     await db.im_at_work_seller(message.from_user.id, 'true')
-    await message.answer('Теперь Вы будете получать заказы')
+    await message.answer(f'{success_em} Теперь Вы будете получать заказы')
 
 
 @dp.message_handler(IsSellerMessage(), commands=['im_at_home'], state=['*'])
 async def im_at_home(message: types.Message):
     """Ставим статус дома"""
     await db.im_at_work_seller(message.from_user.id, 'false')
-    await message.answer('Теперь Вы не будете получать заказы')
+    await message.answer(f'{error_em} Теперь Вы не будете получать заказы')
 
 
 @dp.message_handler(IsSellerMessage(), commands=['active_orders'], state=["*"])
@@ -188,11 +189,12 @@ async def bonus_orders_to_confirm_delivery(message: types.Message, state: FSMCon
 
 
 @dp.callback_query_handler(confirm_order_seller_data.filter(status='confirm'), state=['*'])
-async def seller_confirms_order(call: CallbackQuery, callback_data: dict):
+async def seller_confirms_order(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Продавец нажимает принять ордер"""
     await call.message.edit_reply_markup()
     order_id = int(callback_data.get('order_id'))
     order_taked = await db.take_order(order_id)
+    await state.update_data(order_id=order_id)
     if order_taked:
         time_user_location = await db.get_time_and_user_id(order_id)
         delivery_to = datetime.now(timezone('Europe/Moscow')) + timedelta(minutes=time_user_location[0])
@@ -204,13 +206,15 @@ async def seller_confirms_order(call: CallbackQuery, callback_data: dict):
                                                           delivery_to.strftime("%H:%M"))
                 await call.message.answer(f'Заказ № {order_id} подтвержден!\n'
                                           f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
-                                          f'Не забудьте отметить готовность заказа. Найти его можно в /active_orders')
+                                          f'{warning_em} Не забудьте подтвердить что заказ готов. \n'
+                                          f'{attention_em} Посмотреть заказы можно в /active_orders')
             except Exception as err:
                 logging.error(err)
                 await call.message.answer(f'Не удалось отправить подтверждение пользователю.'
                                           f'Заказ № {order_id} подтвержден!\n'
                                           f'Нужно приготовить к {delivery_to.strftime("%H:%M")}\n'
-                                          f'Не забудьте отметить готовность заказа. Найти его можно в /active_orders')
+                                          f'{warning_em} Не забудьте подтвердить что заказ готов. \n'
+                                          f'{attention_em} Посмотреть заказы можно в /active_orders')
         else:
             couriers = await db.get_couriers_for_location(time_user_location[2])
             if couriers:
@@ -219,8 +223,8 @@ async def seller_confirms_order(call: CallbackQuery, callback_data: dict):
                 await SelectCourier.WaitCourier.set()
             else:
                 await db.update_order_status(order_id, 'Ожидание подтверждения продавца')
-                await call.message.answer('Нет доступных курьеров. Свяжитесь с кем-нибудь. Заказ потом можно найти в '
-                                          '/unaccepted_orders')
+                await call.message.answer(f'{error_em} Нет доступных курьеров. Свяжитесь с кем-нибудь. '
+                                          f'Потом принять заказ можно в /unaccepted_orders')
     else:
         await call.message.answer('Заказ уже обработан. Посмотреть заказы можно в /active_orders')
 
@@ -229,21 +233,30 @@ async def seller_confirms_order(call: CallbackQuery, callback_data: dict):
 async def select_courier(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Продавец выбирает курьера"""
     await call.message.edit_reply_markup()
-    courier_tg_id = int(callback_data.get("courier_tg_id"))
-    courier_name = await db.get_courier_name(courier_tg_id)
-    order_id = int(callback_data.get('order_id'))
-    await db.update_order_courier(order_id, courier_name, courier_tg_id)
-    order_info = await db.get_order_info_for_courier(order_id)
-    await send_message_to_courier_order(courier_tg_id, order_info)
-    try:
-        await send_confirm_message_to_user_delivery(order_info, courier_name)
-        await call.message.answer("Уведомления курьеру и клиенту отправлены."
-                                  'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
-    except Exception as err:
-        logging.error(err)
-        await call.message.answer("Не удалось отправить уведомление пользователю"
-                                  "Уведомление курьеру отправлено."
-                                  'Не забудьте отметить готовность заказа. Посмотреть заказы можно в /active_orders')
+    data = await state.get_data()
+    order_id = data.get('order_id')
+    order_taked = await db.take_order(order_id)
+    if order_taked:
+        courier_tg_id = int(callback_data.get("courier_tg_id"))
+        courier_name = await db.get_courier_name(courier_tg_id)
+        order_id = int(callback_data.get('order_id'))
+        await db.update_order_courier(order_id, courier_name, courier_tg_id)
+        order_info = await db.get_order_info_for_courier(order_id)
+        await send_message_to_courier_order(courier_tg_id, order_info)
+        try:
+            await send_confirm_message_to_user_delivery(order_info, courier_name)
+            await call.message.answer('Уведомления курьеру и клиенту отправлены. '
+                                      f'{warning_em} Не забудьте подтвердить что заказ '
+                                      'готов для доставки. '
+                                      f'{attention_em} Посмотреть заказы можно в /active_orders')
+        except Exception as err:
+            logging.error(err)
+            await call.message.answer("Не удалось отправить уведомление пользователю"
+                                      "Уведомление курьеру отправлено."
+                                      f'{warning_em} Не забудьте подтвердить что заказ готов для доставки. '
+                                      f'{attention_em} Посмотреть заказы можно в /active_orders')
+    else:
+        await call.message.answer('Заказ уже обработан. Посмотреть заказы можно в /active_orders')
     await state.finish()
 
 
@@ -286,12 +299,13 @@ async def order_ready(call: CallbackQuery, callback_data: dict):
         await bot.send_message(chat_id=order_detail['order_courier_telegram_id'],
                                text=f"Заказ № {order_id} готов для доставки!\n"
                                     f"{order_detail['order_info']}\n"
-                                    f"Адрес достаки: {order_detail['order_local_object_name']}, \n"
+                                    f"Адрес доставки: {order_detail['order_local_object_name']}, \n"
                                     f"{order_detail['delivery_address']}\n"
-                                    f"Стоимость заказа: {order_detail['order_price']}\n"
+                                    f"Стоимость заказа: {order_detail['order_price']} руб.\n"
                                     f"Доставить нужно к {order_detail['deliver_to'].strftime('%H:%M')}\n"
-                                    f"Не забудьте подтвердить заказ после доставки."
-                                    f"Посмотреть все готовые для доставки заказы и подтвердить их: /all_ready_orders")
+                                    f"{warning_em} Не забудьте подтвердить заказ после доставки.\n"
+                                    f"{attention_em} Посмотреть все готовые для доставки заказы и подтвердить их: "
+                                    f"/all_ready_orders")
         await bot.send_message(client_id,
                                f'Ваш заказ № {order_id} готов. Курьер уже в пути.')
         await call.message.answer("Уведомление курьеру и клиенту отправлено")
@@ -313,8 +327,8 @@ async def order_ready(call: CallbackQuery, callback_data: dict):
                                     f"Пожалуйста, заберите заказ по адресу:\n"
                                     f"{order_detail['delivery_address']}\n"
                                     f"Стоимость заказа: {order_detail['order_price']}\n")
-        await call.message.answer("Уведомление клиенту отправлено, не забудьте подтвердить "
-                                  "выдачу товара /confirm_delivery")
+        await call.message.answer("Уведомление клиенту отправлено. \n"
+                                  f"{warning_em} Не забудьте подтвердить выдачу товара /confirm_delivery")
     else:
         await call.message.answer("Заказ уже обработан.")
 
@@ -352,7 +366,7 @@ async def confirm_bonus_order_seller(call: CallbackQuery, callback_data: dict):
                                text=f"Ваш бонусный заказ № {bonus_order_info['bonus_order_id']}Б подтвержден.\n"
                                     f"Когда он будет готов, Вам придет уведомление.\n")
         await call.message.answer(f'Бонусный заказ № {bonus_order_info["bonus_order_id"]}Б подтвержден.\n'
-                                  f'Когда он будет готов сообщите клиенту: /confirm_readiness_bonus_orders')
+                                  f'{warning_em} Когда он будет готов сообщите клиенту: /confirm_readiness_bonus_orders')
     else:
         await call.message.answer('Заказ уже обработан')
 
@@ -366,9 +380,10 @@ async def confirm_readiness_bonus(call: CallbackQuery, callback_data: dict):
     await db.set_bonus_order_status(b_order_id, 'Готов')
     await bot.send_message(client_id,
                            f"Ваш бонусный заказ № {b_order_id}Б готов!\n"
-                           f"Подойдите к продавцу чтобы забрать его.")
+                           f"{attention_em} Подойдите к продавцу чтобы забрать его.")
     await call.message.answer(
-        "Уведомление клиенту отправлено! После выдачи заказа отметьте его в /confirm_bonus_orders")
+        "Уведомление клиенту отправлено! \n"
+        f"{warning_em} Не забудьте подтвердить выдачу /confirm_bonus_orders")
 
 
 @dp.callback_query_handler(bonus_order_is_delivered_data.filter(), state=['*'])

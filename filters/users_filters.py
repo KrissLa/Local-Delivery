@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import types
 from aiogram.dispatcher.filters import BoundFilter
 
@@ -98,3 +100,9 @@ class IsBanned(BoundFilter):
     async def check(self, message: types.Message):
         """Забаненые пользователи"""
         return await db.is_banned(message.from_user.id)
+
+
+class SellerAdminHasLocationMessage(BoundFilter):
+    async def check(self, message: types.Message):
+        """Проверка на продовца-админа в сообщении"""
+        return await db.has_location_seller_admin(message.from_user.id)

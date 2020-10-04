@@ -6,23 +6,464 @@ from aiogram.types import CallbackQuery, ContentTypes, InlineKeyboardMarkup, Inl
 
 from filters.users_filters import IsAdminMessage
 from keyboards.inline.callback_datas import admin_data, metro_del_data, location_data, categories_data, new_item_size, \
-    edit_item_data, edit_item_sizes_data, edit_size_data
+    edit_item_data, edit_item_sizes_data, edit_size_data, take_delivery_order, dont_take_delivery_order, \
+    confirm_delivery_order
 from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_key_board_with_admins, \
     generate_key_board_with_metro, yes_and_cancel_admin_markup, generate_key_board_with_locations, \
     add_one_more_local_object, add_one_more_category_markup, generate_keyboard_with_categories_for_add_item, \
     item_with_size, confirm_item_markup, add_one_more_product_size, generate_keyboard_with_metro_for_seller_admin, \
-    get_edit_item_markup, back_button, back_to_choices_sizes, confirm_item_markup_first
+    get_edit_item_markup, back_button, back_to_choices_sizes, confirm_item_markup_first, \
+    generate_keyboard_with_delivery_categories_for_add_item, gen_take_order_markup, confirm_cancel_delivery, \
+    gen_confirm_order_markup
 from loader import dp, bot, db
 from states.admin_state import AddAdmin
 from utils.check_states import states_for_menu, reset_state
-from utils.emoji import attention_em, attention_em_red
+from utils.emoji import attention_em, attention_em_red, error_em, success_em, warning_em
 from utils.temp_orders_list import get_list_of_location_message, get_list_of_local_objects, get_list_of_category, \
     get_sizes, get_list_of_products, get_list_of_seller_admins, get_list_of_sellers, get_list_of_couriers, \
     get_list_of_seller_admins_for_reset, get_list_of_sellers_for_reset, get_list_of_couriers_for_reset, \
     get_list_of_category_for_remove_from_stock, get_list_of_category_for_return_to_stock, \
     get_list_of_products_for_remove_from_stock, get_list_of_products_for_return_to_stock, \
     get_list_of_seller_admins_for_change, get_list_of_sellers_for_change, get_list_of_couriers_for_change, \
-    get_list_of_products_for_edit, get_sizes_for_remove, get_sizes_for_edit
+    get_list_of_products_for_edit, get_sizes_for_remove, get_sizes_for_edit, weekdays, get_list_of_delivery_category, \
+    get_list_of_delivery_products, get_list_of_delivery_products_for_remove_from_stock
+
+
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_item_from_stock'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_item_from_stock'])
+async def remove_item_from_stock(message: types.Message, state: FSMContext):
+    """Убираем товар из продажу"""
+    await reset_state(state, message)
+    category_list = await db.get_delivery_category_for_remove_item_from_stock()
+    if category_list:
+        await message.answer('Выберите категорию, из которой нужно убрать товар.',
+                             reply_markup=await generate_keyboard_with_delivery_categories_for_add_item(category_list))
+    else:
+        await message.answer('Пока нет категорий.',
+                             reply_markup=cancel_admin_markup)
+
+    await AddAdmin.RemoveDeliveryItemFromStockCategory.set()
+
+
+@dp.callback_query_handler(categories_data.filter(), state=AddAdmin.RemoveDeliveryItemFromStockCategory)
+async def get_category_for_remove_item_from_stock(call: CallbackQuery, callback_data: dict):
+    """Получаем категорию из которой будем убирать товар"""
+    await call.message.edit_reply_markup()
+    category_id = int(callback_data.get('category_id'))
+    products = await db.get_delivery_products_for_remove_from_stock(category_id)
+    if products:
+        list_of_products = await get_list_of_delivery_products_for_remove_from_stock(products)
+        await call.message.answer(list_of_products,
+                                  reply_markup=cancel_admin_markup)
+    else:
+        await call.message.answer('В этой категории нет товаров в продаже',
+                                  reply_markup=cancel_admin_markup)
+    await AddAdmin.RemoveDeliveryItemFromStockProduct.set()
+
+
+@dp.message_handler(IsAdminMessage(), regexp="remove_delivery_item_from_stock_by_id_\d+",
+                    state=AddAdmin.RemoveItemFromStockProduct)
+async def remove_item_from_stock_by_id(message: types.Message, state: FSMContext):
+    """Убираем товар с продажи"""
+    try:
+        product_id = int(message.text.split('_')[-1])
+        await db.remove_from_stock_delivery_item(product_id)
+        await message.answer('Товар снят с продажи\n'
+                             f'{attention_em} Чтобы снять еще один снова введите /remove_item_from_stock\n'
+                             f'{attention_em} Чтобы вернуть в продажу введите /return_item_to_stock')
+        await state.finish()
+    except Exception as err:
+        logging.error(err)
+        await message.answer(f'{error_em} Неизвестная команда',
+                             reply_markup=cancel_admin_markup)
+
+
+#########
+###################
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_item'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_item'])
+async def remove_item(message: types.Message, state: FSMContext):
+    """Удаление товара"""
+    await reset_state(state, message)
+    categories = await db.get_list_of_delivery_categories_with_items()
+    await message.answer('Выберите категорию, из которой нужно удалить товар',
+                         reply_markup=await generate_keyboard_with_delivery_categories_for_add_item(categories))
+    await AddAdmin.RemoveDeliveryItemCat.set()
+
+
+@dp.callback_query_handler(categories_data.filter(), state=AddAdmin.RemoveDeliveryItemCat)
+async def get_category_for_remove_item(call: CallbackQuery, callback_data: dict):
+    """Получаем категорию, из которой нужно удалить товар"""
+    await call.message.edit_reply_markup()
+    category_id = int(callback_data.get('category_id'))
+    list_of_products = await db.get_delivery_products_list(category_id)
+    if list_of_products:
+        await call.message.answer(f"{attention_em_red} Удаление происходит сразу после нажатия на команду!\n\n"
+                                  f"{await get_list_of_delivery_products(list_of_products)}",
+                                  reply_markup=cancel_admin_markup)
+    else:
+        await call.message.answer("В этой категории нет товаров",
+                                  reply_markup=cancel_admin_markup)
+    await AddAdmin.RemoveDeliveryItem.set()
+
+
+@dp.message_handler(IsAdminMessage(), regexp="remove_delivery_item_by_id_\d+", state=AddAdmin.RemoveDeliveryItem)
+async def remove_item_by_id(message: types.Message, state: FSMContext):
+    """Удаляем товар"""
+    try:
+        product_id = int(message.text.split('_')[-1])
+        await db.delete_delivery_product_by_id(product_id)
+        await message.answer(f'{success_em} Товар удален. \n'
+                             f'{attention_em} Чтобы удалить еще один снова введите /remove_delivery_item')
+        await state.finish()
+    except Exception as err:
+        logging.error(err)
+        await message.answer(f'{error_em} Неизвестная команда',
+                             reply_markup=cancel_admin_markup)
+
+
+#######################
+
+
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_category'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_category'])
+async def remove_delivery_category(message: types.Message, state: FSMContext):
+    """Удаляем категорию"""
+    await reset_state(state, message)
+    await message.answer(f'{attention_em_red} Удаление происходит сразу после нажатия на команду.\n'
+                         f'{attention_em}Вместе с категорией удаляются все товары в ней')
+    category_list = await db.get_delivery_category_list()
+    if category_list:
+        list_message = await get_list_of_delivery_category(category_list)
+        await message.answer(list_message,
+                             reply_markup=cancel_admin_markup)
+    else:
+        await message.answer('Нет категорий.',
+                             reply_markup=cancel_admin_markup)
+
+    await AddAdmin.RemoveDeliveryCategory.set()
+
+
+@dp.message_handler(IsAdminMessage(), regexp="remove_delivery_category_by_id_\d+",
+                    state=AddAdmin.RemoveDeliveryCategory)
+async def remove_category_by_id(message: types.Message, state: FSMContext):
+    """Удаляем category"""
+    try:
+        category_id = int(message.text.split('_')[-1])
+        await db.delete_delivery_category_by_id(category_id)
+        await message.answer(f'{success_em} Категория удалена. \n'
+                             f'{attention_em} Чтобы удалить еще одну снова введите /remove_delivery_category')
+        await state.finish()
+    except Exception as err:
+        logging.error(err)
+        await message.answer(f'{error_em} Неизвестная команда',
+                             reply_markup=cancel_admin_markup)
+
+
+@dp.message_handler(IsAdminMessage(), commands=['take_orders'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['take_orders'])
+async def take_orders(message: types.Message, state: FSMContext):
+    """Список непринятых или измененных заказов"""
+    await reset_state(state, message)
+    orders = await db.get_unaccepted_delivery_orders()
+    if orders:
+        await message.answer('Список непринятых или измененных заказов:')
+        for order in orders:
+            await message.answer(f'Заказ № {order["delivery_order_id"]}\n'
+                                 f'{order["delivery_order_info"]}'
+                                 f'Сумма заказа: {order["delivery_order_price"]} руб.\n'
+                                 f'telegramID пользователя - {order["delivery_order_user_telegram_id"]}\n'
+                                 f'Адрес доставки: {order["location_name"]}\n'
+                                 f'{order["location_address"]}\n'
+                                 f'Время создания {order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                 f'Дата доставки: {order["day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order["day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order["delivery_time_info"]}\n'
+                                 f'Статус заказа: {order["delivery_order_status"]}\n'
+                                 f'{attention_em} Чтобы принять или отклонить нажмите '
+                                 f'/take_order_{order["delivery_order_id"]}')
+    else:
+        await message.answer('Нет непринятых или измененных заказов.')
+
+
+@dp.message_handler(IsAdminMessage(), regexp="take_order_\d+", state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), regexp="take_order_\d+", state='*')
+async def take_order__by_id(message: types.Message, state: FSMContext):
+    """take_order"""
+    await reset_state(state, message)
+    try:
+        order_id = int(message.text.split('_')[-1])
+        if order_id in await db.get_unaccepted_delivery_orders_ids():
+            order_data = await db.get_delivery_order_data(order_id)
+            await message.answer(f'Заказ № {order_data["delivery_order_id"]}\n'
+                                 f'{order_data["delivery_order_info"]}'
+                                 f'Сумма заказа: {order_data["delivery_order_price"]} руб.\n'
+                                 f'telegramID пользователя - {order_data["delivery_order_user_telegram_id"]}\n'
+                                 f'Адрес доставки: {order_data["location_name"]}\n'
+                                 f'{order_data["location_address"]}\n'
+                                 f'Время создания {order_data["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                 f'Дата доставки: {order_data["day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order_data["day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order_data["delivery_time_info"]}\n'
+                                 f'Статус заказа: {order_data["delivery_order_status"]}\n',
+                                 reply_markup=await gen_take_order_markup(order_data["delivery_order_id"]))
+            await AddAdmin.TakeOrders.set()
+        else:
+            await message.answer(f'Нет непринятого или измененного заказ с номером № {order_id}')
+    except Exception as err:
+        logging.info(err)
+        await message.answer('Неизвестная команда')
+
+
+@dp.callback_query_handler(text='back', state=AddAdmin.TakeOrdersWait)
+async def back(call: CallbackQuery, state: FSMContext):
+    """Назад"""
+    await call.message.edit_reply_markup()
+    data = await state.get_data()
+    order_id = data.get('order_id')
+    if order_id in await db.get_unaccepted_delivery_orders_ids():
+        order_data = await db.get_delivery_order_data(order_id)
+        await call.message.answer(f'Заказ № {order_data["delivery_order_id"]}\n'
+                                  f'{order_data["delivery_order_info"]}'
+                                  f'Сумма заказа: {order_data["delivery_order_price"]} руб.\n'
+                                  f'telegramID пользователя - {order_data["delivery_order_user_telegram_id"]}\n'
+                                  f'Адрес доставки: {order_data["location_name"]}\n'
+                                  f'{order_data["location_address"]}\n'
+                                  f'Время создания {order_data["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                  f'Дата доставки: {order_data["day_for_delivery"].strftime("%d.%m.%Y")} '
+                                  f'{weekdays[order_data["day_for_delivery"].weekday()]}\n'
+                                  f'Время доставки: {order_data["delivery_time_info"]}\n'
+                                  f'Статус заказа: {order_data["delivery_order_status"]}\n',
+                                  reply_markup=await gen_take_order_markup(order_data["delivery_order_id"]))
+        await AddAdmin.TakeOrders.set()
+    else:
+        await call.message.answer(f'Нет непринятого или измененного заказ с номером № {order_id}')
+
+
+@dp.callback_query_handler(take_delivery_order.filter(), state=AddAdmin.TakeOrders)
+async def take_order_confirm(call: CallbackQuery, state: FSMContext, callback_data: dict):
+    """Принять заказ"""
+    await call.message.edit_reply_markup()
+    order_id = int(callback_data.get('order_id'))
+    status = await db.get_delivery_order_status(order_id)
+    if status == 'Ожидание подтверждения':
+        await db.update_delivery_order_status(order_id, 'Заказ подтвержден')
+    elif status == 'Заказ изменен':
+        await db.update_delivery_order_status(order_id, 'Заказ подтвержден после изменения')
+    else:
+        await call.message.answer(f'{error_em} Что-то пошло не так!')
+        await state.finish()
+        return
+    await call.message.answer(f'{success_em} Заказ № {order_id} принят.\n'
+                              f'{warning_em} Подтвердить доставку - /confirm_delivery_{order_id}\n'
+                              f'{attention_em} Посмотреть список заказов, которые нужно доставить - '
+                              f'/confirm_delivery')
+    await state.finish()
+
+
+@dp.callback_query_handler(dont_take_delivery_order.filter(), state=[AddAdmin.TakeOrders,
+                                                                     AddAdmin.ConfirmDeliveryOrders])
+async def take_order_cancel(call: CallbackQuery, callback_data: dict, state: FSMContext):
+    """Отклонить заказ заказ"""
+    await call.message.edit_reply_markup()
+    order_id = int(callback_data.get('order_id'))
+    await state.update_data(order_id=order_id)
+    await call.message.answer("Вы уверены что хотите отклонить заказ?",
+                              reply_markup=confirm_cancel_delivery)
+    await AddAdmin.TakeOrdersWait.set()
+
+
+@dp.callback_query_handler(text='confirm_cancel_delivery', state=AddAdmin.TakeOrdersWait)
+async def cancel_order(call: CallbackQuery, state: FSMContext):
+    """Отменяем заказ"""
+    await call.message.edit_reply_markup()
+    data = await state.get_data()
+    order_id = data.get('order_id')
+    order_owner = await db.get_delivery_order_owner(order_id)
+    await db.update_delivery_order_status(order_id, 'Отменен')
+    try:
+        await bot.send_message(order_owner, f'{error_em} Ваш заказ на поставку продуктов № {order_id} отменен.')
+        await call.message.answer(f'{success_em} Заказ № {order_id} отменен.\n')
+    except Exception as err:
+        logging.error(err)
+        await call.message.answer(f'{success_em} Заказ № {order_id} отменен.\n'
+                                  f'{error_em} Не удалось отправить уведомление об отмене админу локации.')
+
+    await state.finish()
+
+
+@dp.message_handler(IsAdminMessage(), commands=['confirm_delivery'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['confirm_delivery'])
+async def take_orders(message: types.Message, state: FSMContext):
+    """Список непринятых или измененных заказов"""
+    await reset_state(state, message)
+    orders = await db.get_accepted_delivery_orders()
+    if orders:
+        await message.answer('Список заказов, ожидающих доставки:')
+        for order in orders:
+            await message.answer(f'Заказ № {order["delivery_order_id"]}\n'
+                                 f'{order["delivery_order_info"]}'
+                                 f'Сумма заказа: {order["delivery_order_price"]} руб.\n'
+                                 f'telegramID пользователя - {order["delivery_order_user_telegram_id"]}\n'
+                                 f'Адрес доставки: {order["location_name"]}\n'
+                                 f'{order["location_address"]}\n'
+                                 f'Время создания {order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                 f'Дата доставки: {order["day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order["day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order["delivery_time_info"]}\n'
+                                 f'Статус заказа: {order["delivery_order_status"]}\n'
+                                 f'{attention_em} Чтобы подтвердить доставку или отклонить нажмите '
+                                 f'/confirm_delivery_{order["delivery_order_id"]}')
+    else:
+        await message.answer('Нет заказов, ожидающих доставки.')
+
+
+@dp.message_handler(IsAdminMessage(), regexp="confirm_delivery_\d+", state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), regexp="confirm_delivery_\d+", state='*')
+async def confirm_delivery_by_id(message: types.Message, state: FSMContext):
+    """Подтверждаем доставку"""
+    await reset_state(state, message)
+    try:
+        order_id = int(message.text.split('_')[-1])
+        if order_id in await db.get_accepted_delivery_orders_ids():
+            order_data = await db.get_delivery_order_data(order_id)
+            await message.answer(f'Заказ № {order_data["delivery_order_id"]}\n'
+                                 f'{order_data["delivery_order_info"]}'
+                                 f'Сумма заказа: {order_data["delivery_order_price"]} руб.\n'
+                                 f'telegramID пользователя - {order_data["delivery_order_user_telegram_id"]}\n'
+                                 f'Адрес доставки: {order_data["location_name"]}\n'
+                                 f'{order_data["location_address"]}\n'
+                                 f'Время создания {order_data["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                 f'Дата доставки: {order_data["day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order_data["day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order_data["delivery_time_info"]}\n'
+                                 f'Статус заказа: {order_data["delivery_order_status"]}\n',
+                                 reply_markup=await gen_confirm_order_markup(order_data["delivery_order_id"]))
+            await AddAdmin.ConfirmDeliveryOrders.set()
+        else:
+            await message.answer(f'Нет принятого и не доставленного заказа с номером № {order_id}')
+    except Exception as err:
+        logging.info(err)
+        await message.answer('Неизвестная команда')
+
+
+@dp.callback_query_handler(confirm_delivery_order.filter(), state=AddAdmin.ConfirmDeliveryOrders)
+async def confirm_delivery_orderr(call: CallbackQuery, callback_data: dict, state: FSMContext):
+    """Подтверждаем доставку заказа"""
+    await call.message.edit_reply_markup()
+    order_id = int(callback_data.get('order_id'))
+    await db.update_delivery_order_status(order_id, 'Заказ доставлен')
+    order_owner = await db.get_delivery_order_owner(order_id)
+    try:
+        await bot.send_message(order_owner, f'{success_em} Ваш заказ на поставку продуктов № {order_id} доставлен.')
+        await call.message.answer(f'{success_em} Заказ № {order_id} доставлен.\n')
+    except Exception as err:
+        logging.error(err)
+        await call.message.answer(f'{success_em} Заказ № {order_id} доставлен.\n'
+                                  f'{error_em} Не удалось отправить уведомление о доставке админу локации.')
+    await state.finish()
+
+
+@dp.message_handler(IsAdminMessage(), commands=['add_delivery_category'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['add_delivery_category'])
+async def add_delivery_category(message: types.Message, state: FSMContext):
+    """Добавиление категории"""
+    await reset_state(state, message)
+    await message.answer('Введите название категории для оптовых поставок',
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.DeliveryCategoryName.set()
+
+
+@dp.message_handler(state=AddAdmin.DeliveryCategoryName)
+async def get_delivery_category_name(message: types.Message, state: FSMContext):
+    await db.add_delivery_category(message.text)
+    await message.answer(f'{success_em} Новая категория для оптовых поставок добавлена!\n'
+                         f'"{message.text}"')
+    await state.finish()
+
+
+@dp.message_handler(IsAdminMessage(), commands=['add_delivery_item'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['add_delivery_item'])
+async def add_delivery_item(message: types.Message, state: FSMContext):
+    """Добавление товара"""
+    await reset_state(state, message)
+    categories = await db.get_list_of_delivery_categories()
+    if categories:
+        await message.answer("Выберите категорию",
+                             reply_markup=await generate_keyboard_with_delivery_categories_for_add_item(categories))
+        await AddAdmin.DeliveryItemCategory.set()
+    else:
+        await message.answer("Пока нет категорий. Чтобы добавить нажмите /add_delivery_category")
+
+
+@dp.callback_query_handler(categories_data.filter(), state=AddAdmin.DeliveryItemCategory)
+async def get_item_category(call: CallbackQuery, callback_data: dict, state: FSMContext):
+    """Получаем id категории"""
+    await call.message.edit_reply_markup()
+    category_id = int(callback_data.get('category_id'))
+    category_name = await db.get_delivery_category_name_by_id(category_id)
+    new_item = {
+        'category_id': category_id,
+        'category_name': category_name
+    }
+    await state.update_data(new_delivery_item=new_item)
+    await call.message.answer(f"Вы ввели:\n"
+                              f"Категория: {category_name}\n\n"
+                              f"Введите название нового товара",
+                              reply_markup=cancel_admin_markup)
+    await AddAdmin.DeliveryItemName.set()
+
+
+@dp.message_handler(state=AddAdmin.DeliveryItemName)
+async def get_delivery_item_name(message: types.Message, state: FSMContext):
+    """Получаем название товара"""
+    data = await state.get_data()
+    new_delivery_item = data.get('new_delivery_item')
+    new_delivery_item['item_name'] = message.text
+    await state.update_data(new_delivery_item=new_delivery_item)
+    await message.answer(f'Вы ввели:\n'
+                         f'Категория: {new_delivery_item["category_name"]}\n'
+                         f'Название товара: {new_delivery_item["item_name"]}\n\n'
+                         f'{attention_em} Теперь введите цену товара.\n'
+                         f'Пример: \n'
+                         f'1650',
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.DeliveryItemPrice.set()
+
+
+@dp.message_handler(state=AddAdmin.DeliveryItemPrice)
+async def get_delivery_order_price(message: types.Message, state: FSMContext):
+    """Получаем цену товара"""
+    try:
+        price = int(message.text)
+        data = await state.get_data()
+        new_delivery_item = data.get('new_delivery_item')
+        new_delivery_item['price'] = price
+        await db.add_delivery_item(new_delivery_item)
+        await message.answer(f'{success_em} Новый товар оптовой поставки успешно добавлен!\n\n'
+                             f'Категория: {new_delivery_item["category_name"]}\n'
+                             f'Название товара: {new_delivery_item["item_name"]}\n'
+                             f'Цена за 1 лоток (12шт): {price} руб.')
+        await state.finish()
+    except Exception as err:
+        logging.error(err)
+        await message.answer(f"{error_em} Вам нужно ввести число.\n"
+                             f'Пример: \n'
+                             f'1650',
+                             reply_markup=cancel_admin_markup)
+
+
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_item'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_item'])
+async def remove_delivery_item(message: types.Message, state: FSMContext):
+    """Удаление товара"""
+    await reset_state(state, message)
+    categories = await db.get_list_of_categories()
+    await message.answer('Выберите категорию, из которой нужно удалить товар',
+                         reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
+    await AddAdmin.RemoveItemCategory.set()
+    # await message.answer(f'Выберите категорию, из которой нужно удалить товар.',
+    #                      reply_markup=)
 
 
 @dp.message_handler(IsAdminMessage(), commands=['ban_user'], state=states_for_menu)
@@ -125,8 +566,8 @@ async def delete_location(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     await message.answer(f'{attention_em_red} После удаления локации удалятся объекты локальной доставки, '
                          f'привязанные к ней.\n'
-                         'Продавцы и курьеры будут откреплены от точки продаж.\n'
-                         'Удаление происходит сразу после нажатия на команду')
+                         f'{attention_em} Продавцы и курьеры будут откреплены от точки продаж.\n'
+                         f'{attention_em_red} Удаление происходит сразу после нажатия на команду')
     location_list = await db.get_list_of_locations()
     if location_list:
         list_message = await get_list_of_location_message(location_list)
@@ -181,7 +622,7 @@ async def remove_category(message: types.Message, state: FSMContext):
     """Удаляем категорию"""
     await reset_state(state, message)
     await message.answer(f'{attention_em_red} Удаление происходит сразу после нажатия на команду.\n'
-                         'Вместе с категорией удаляются все товары в ней')
+                         f'{attention_em}Вместе с категорией удаляются все товары в ней')
     category_list = await db.get_category_list()
     if category_list:
         list_message = await get_list_of_category(category_list)
@@ -213,10 +654,13 @@ async def add_item(message: types.Message, state: FSMContext):
 async def remove_item(message: types.Message, state: FSMContext):
     """Удаление товара"""
     await reset_state(state, message)
-    categories = await db.get_list_of_categories()
-    await message.answer('Выберите категорию, из которой нужно удалить товар',
-                         reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
-    await AddAdmin.RemoveItemCategory.set()
+    categories = await db.get_list_of_categories_with_items()
+    if categories:
+        await message.answer('Выберите категорию, из которой нужно удалить товар',
+                             reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
+        await AddAdmin.RemoveItemCategory.set()
+    else:
+        await message.answer(f'{error_em}Нечего удалять.')
 
 
 @dp.message_handler(IsAdminMessage(), commands=['add_seller_admin'], state=states_for_menu)
@@ -509,7 +953,7 @@ async def get_ban_id(message: types.Message, state: FSMContext):
                              reply_markup=cancel_admin_markup)
         await AddAdmin.BanReason.set()
     except Exception as err:
-        await message.answer('Не получилось, попробуйте еще раз',
+        await message.answer(f'{error_em} Не получилось, попробуйте еще раз',
                              reply_markup=cancel_admin_markup)
         await AddAdmin.BanID.set()
         logging.error(err)
@@ -525,7 +969,7 @@ async def get_ban_reason(message: types.Message, state: FSMContext):
         await db.ban_user(ban_id, reason)
         await message.answer('Пользователь забанен.')
     except Exception as err:
-        await message.answer('Не получилось. Попробуйте вручную через базу данных.')
+        await message.answer(f'{error_em} Не получилось. Попробуйте вручную через базу данных.')
         logging.error(err)
     await state.finish()
 
@@ -540,11 +984,11 @@ async def get_unban_id(message: types.Message, state: FSMContext):
             await message.answer('Пользователь разбанен')
         except Exception as err:
             logging.error(err)
-            await message.answer("Не получилось, попробуйте вручную через базу данных")
+            await message.answer(f"{error_em} Не получилось, попробуйте вручную через базу данных")
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer("Попробуйте ввести еще раз.",
+        await message.answer(f"{error_em} Попробуйте ввести еще раз.",
                              reply_markup=cancel_admin_markup)
         await AddAdmin.UnBanID.set()
 
@@ -622,7 +1066,8 @@ async def get_admin_name(message: types.Message, state: FSMContext):
     await state.update_data(name=name)
     await message.answer(f"Отлично!\n"
                          f"Имя админа - {name}\n"
-                         f"Теперь введите id телеграма админа. Взять id сотрудник может в этом боте @myidbot\n"
+                         f"Теперь введите id телеграма админа. \n"
+                         f"{attention_em}Взять id сотрудник может в этом боте @myidbot\n"
                          f"{attention_em_red} Пользователю будет отправлено сообщение о назначении должности. "
                          f"Поэтому он должен отправить боту хотя бы одно сообщение перед назначением.",
                          reply_markup=cancel_admin_markup)
@@ -637,7 +1082,7 @@ async def get_admin_id(message: types.Message, state: FSMContext):
         data = await state.get_data()
         name = data.get('name')
 
-        await bot.send_message(new_id, 'Вам назначили должность "админ"')
+        await bot.send_message(new_id, 'Вам назначили должность "Админ"')
         if await db.add_admin(new_id, name):
             await message.answer('Админ успешно добавлен.')
             await state.finish()
@@ -646,7 +1091,7 @@ async def get_admin_id(message: types.Message, state: FSMContext):
             await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Не получается добавить пользователя. Возможно, он не отправил боту сообщение.'
+        await message.answer(f'{error_em} Не получается добавить пользователя. Возможно, он не отправил боту сообщение.'
                              'Попробуйте еще раз.',
                              reply_markup=cancel_admin_markup)
         await AddAdmin.WaitId.set()
@@ -752,7 +1197,8 @@ async def save_newlocation(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     new_location = data.get('new_location')
     await db.add_location(new_location)
-    await call.message.answer('Новая локация добавлена. Чтобы добавить объект локальной доставки '
+    await call.message.answer('Новая локация добавлена. \n'
+                              f'{attention_em} Чтобы добавить объект локальной доставки '
                               'введите /add_local_object')
     await state.finish()
 
@@ -763,7 +1209,8 @@ async def delete_location_by_id(message: types.Message, state: FSMContext):
     try:
         location_id = int(message.text.split('_')[-1])
         await db.delete_location_by_id(location_id)
-        await message.answer('Локация удалена. Чтобы удалить еще одну снова введите /delete_location')
+        await message.answer('Локация удалена. '
+                             f'{attention_em} Чтобы удалить еще одну снова введите /delete_location')
         await state.finish()
     except Exception as err:
         logging.error(err)
@@ -844,7 +1291,8 @@ async def delete_location_by_id(message: types.Message, state: FSMContext):
     try:
         local_object_id = int(message.text.split('_')[-1])
         await db.delete_local_object_by_id(local_object_id)
-        await message.answer('Объект локальной доставки удален. Чтобы удалить еще один'
+        await message.answer('Объект локальной доставки удален. \n'
+                             f'{attention_em} Чтобы удалить еще один'
                              ' снова введите /remove_local_object')
         await state.finish()
     except Exception as err:
@@ -886,11 +1334,12 @@ async def remove_category_by_id(message: types.Message, state: FSMContext):
     try:
         category_id = int(message.text.split('_')[-1])
         await db.delete_category_by_id(category_id)
-        await message.answer('Категория удалена. Чтобы удалить еще одну снова введите /remove_category')
+        await message.answer('Категория удалена. \n'
+                             f'{attention_em} Чтобы удалить еще одну снова введите /remove_category')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1023,10 +1472,9 @@ async def get_item_size_name(message: types.Message, state: FSMContext):
     await state.update_data(size_name=size_name)
     await message.answer(f'Вы ввели:\n'
                          f'Название размера: {size_name}\n\n'
-                         f'Теперь введите цену при заказе разного количества ЧЕРЕЗ ЗАПЯТУЮ, например:\n'
-                         f"200, 190, 180, 170, 160, 150\n"
-                         f"Соответствует: 1шт - 200 руб, 2шт - 190 руб, 3шт - 180 руб, 4шт - 170 руб, "
-                         f"5шт - 160 руб, 6шт - 150 руб",
+                         f'Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                         f'Пример:\n'
+                         f"250,240,230,220,210,205",
                          reply_markup=back_to_choices_sizes)
     await AddAdmin.ItemSizePriceFirst.set()
 
@@ -1036,7 +1484,7 @@ async def get_prices_for_size(message: types.Message, state: FSMContext):
     """Получаем цены"""
     prices = message.text
     try:
-        list_of_prices = prices.split(', ')
+        list_of_prices = prices.split(',')
         data = await state.get_data()
         size_name = data.get('size_name')
         size_prices = {
@@ -1061,7 +1509,9 @@ async def get_prices_for_size(message: types.Message, state: FSMContext):
         await AddAdmin.ItemSizeConfirmFirst.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Попробуйте еще раз ввести цены.')
+        await message.answer(f'{error_em} Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                             f'Пример:\n'
+                             f"250,240,230,220,210,205")
         await AddAdmin.ItemSizePriceFirst.set()
 
 
@@ -1072,10 +1522,9 @@ async def get_item_size_name(message: types.Message, state: FSMContext):
     await state.update_data(size_name=size_name)
     await message.answer(f'Вы ввели:\n'
                          f'Название размера: {size_name}\n\n'
-                         f'Теперь введите цену при заказе разного количества ЧЕРЕЗ ЗАПЯТУЮ, например:\n'
-                         f"200, 190, 180, 170, 160, 150\n"
-                         f"Соответствует: 1шт - 200 руб, 2шт - 190 руб, 3шт - 180 руб, 4шт - 170 руб, "
-                         f"5шт - 160 руб, 6шт - 150 руб",
+                         f'Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                         f'Пример:\n'
+                         f"250,240,230,220,210,205",
                          reply_markup=cancel_admin_markup)
     await AddAdmin.ItemSizePrice.set()
 
@@ -1085,7 +1534,7 @@ async def get_prices_for_size(message: types.Message, state: FSMContext):
     """Получаем цены"""
     prices = message.text
     try:
-        list_of_prices = prices.split(', ')
+        list_of_prices = prices.split(',')
         data = await state.get_data()
         size_name = data.get('size_name')
         size_prices = {
@@ -1110,7 +1559,9 @@ async def get_prices_for_size(message: types.Message, state: FSMContext):
         await AddAdmin.ItemSizeConfirm.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Попробуйте еще раз ввести цены.')
+        await message.answer(f'{error_em} Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                             f'Пример:\n'
+                             f"250,240,230,220,210,205")
         await AddAdmin.ItemSizePrice.set()
 
 
@@ -1178,10 +1629,9 @@ async def item_has_no_size(call: CallbackQuery, state: FSMContext):
                               f"Название: {new_item['item_name']}\n"
                               f"Фотография добавлена\n"
                               f"Описание: {new_item['item_description']}\n\n"
-                              f"Введите цену при заказе разного количества ЧЕРЕЗ ЗАПЯТУЮ, например:\n"
-                              f"200, 190, 180, 170, 160, 150\n"
-                              f"Соответствует: 1шт - 200 руб, 2шт - 190 руб, 3шт - 180 руб, 4шт - 170 руб, "
-                              f"5шт - 160 руб, 6шт - 150 руб",
+                              f'Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                              f'Пример:\n'
+                              f"250,240,230,220,210,205",
                               reply_markup=cancel_admin_markup)
     await AddAdmin.ItemPrice.set()
 
@@ -1191,7 +1641,7 @@ async def get_item_price(message: types.Message, state: FSMContext):
     """Получаем цену товара"""
     prices = message.text
     try:
-        list_of_prices = prices.split(', ')
+        list_of_prices = prices.split(',')
         data = await state.get_data()
         new_item = data.get('new_item')
         new_item['prices'] = {
@@ -1218,7 +1668,9 @@ async def get_item_price(message: types.Message, state: FSMContext):
         await AddAdmin.ItemConfirm.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Попробуйте еще раз ввести цены.')
+        await message.answer(f'{error_em} Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                             f'Пример:\n'
+                             f"250,240,230,220,210,205")
         await AddAdmin.ItemPrice.set()
 
 
@@ -1265,11 +1717,12 @@ async def remove_item_by_id(message: types.Message, state: FSMContext):
     try:
         product_id = int(message.text.split('_')[-1])
         await db.delete_product_by_id(product_id)
-        await message.answer('Товар удален. Чтобы удалить еще один снова введите /remove_item')
+        await message.answer('Товар удален. \n'
+                             f'{attention_em} Чтобы удалить еще один снова введите /remove_item')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1280,7 +1733,8 @@ async def get_admin_seller_name(message: types.Message, state: FSMContext):
     await state.update_data(name=name)
     await message.answer(f"Отлично!\n"
                          f"Имя админа локации - {name}\n"
-                         f"Теперь введите telegramID админа. Взять id сотрудник может в этом боте @myidbot\n"
+                         f"Теперь введите telegramID админа. \n"
+                         f"{attention_em} Взять id сотрудник может в этом боте @myidbot\n"
                          f"{attention_em_red} Пользователю будет отправлено сообщение о назначении должности. "
                          f"Поэтому он должен отправить боту хотя бы одно сообщение перед назначением.",
                          reply_markup=cancel_admin_markup)
@@ -1314,17 +1768,19 @@ async def add_seller_admin_without_location(call: CallbackQuery, state: FSMConte
             await bot.send_message('Вам назначена должность "админ локации" пока Вы не закреплены за локацией')
             await call.message.answer(f"{seller_admin_name}\n"
                                       f"Назначен на должность Админ локации.\n"
-                                      f"Привязать его к локации Вы можете командой /change_seller_admin_location")
+                                      f"{attention_em} Привязать его к локации Вы можете командой "
+                                      f"/change_seller_admin_location")
         except Exception as err:
             logging.error(err)
-            await call.message.answer("Добавил в базу, но не смог отправить ему сообщение. Возможно, он не написал "
-                                      "ничего боту.\n"
+            await call.message.answer(f"{error_em} Добавил в базу, но не смог отправить ему сообщение. Возможно, он не"
+                                      f" написал ничего боту.\n"
                                       f"{seller_admin_name}\n"
                                       f"Назначен на должность Админ локации.\n"
-                                      f"Привязать его к локации Вы можете командой /change_seller_admin_location")
+                                      f"{attention_em} Привязать его к локации Вы можете командой "
+                                      f"/change_seller_admin_location")
         await state.finish()
     else:
-        await call.message.answer('Админ локации с таким telegramID уже существует.')
+        await call.message.answer(f'{error_em} Админ локации с таким telegramID уже существует.')
         await state.finish()
 
 
@@ -1358,12 +1814,12 @@ async def get_location_for_seller_admin(call: CallbackQuery, callback_data: dict
         except Exception as err:
             logging.error(err)
             await call.message.answer(f'{seller_admin_name} назначен админом в локации "{location_name}"\n'
-                                      "Добавил его в таблицу, но не смог отправить ему уведомление"
+                                      f"{error_em} Добавил его в таблицу, но не смог отправить ему уведомление"
                                       ". Возможно, он не отправил боту сообщение.\n"
                                       "Вы в главном меню")
         await state.finish()
     else:
-        await call.message.answer('Админ локации с таким telegramID уже существует.')
+        await call.message.answer(f'{error_em} Админ локации с таким telegramID уже существует.')
         await state.finish()
 
 
@@ -1373,11 +1829,12 @@ async def remove_seller_admin_by_id(message: types.Message, state: FSMContext):
     try:
         seller_admin_id = int(message.text.split('_')[-1])
         await db.delete_seller_admin_by_id(seller_admin_id)
-        await message.answer('Админ локации удален. Чтобы удалить еще одного снова введите /remove_seller_admin')
+        await message.answer('Админ локации удален. \n'
+                             f'{attention_em} Чтобы удалить еще одного снова введите /remove_seller_admin')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1388,7 +1845,8 @@ async def get_seller_name(message: types.Message, state: FSMContext):
     await state.update_data(name=name)
     await message.answer(f"Отлично!\n"
                          f"Имя продавца - {name}\n"
-                         f"Теперь введите telegramID продавца. Взять id сотрудник может в этом боте @myidbot\n"
+                         f"Теперь введите telegramID продавца. \n"
+                         f"{attention_em} Взять id сотрудник может в этом боте @myidbot\n"
                          f"{attention_em_red} Пользователю будет отправлено сообщение о назначении должности. "
                          f"Поэтому он должен отправить боту хотя бы одно сообщение перед назначением.",
                          reply_markup=cancel_admin_markup)
@@ -1422,17 +1880,18 @@ async def add_seller_without_location(call: CallbackQuery, state: FSMContext):
             await bot.send_message('Вам назначена должность "Продавец". Пока Вы не закреплены за локацией')
             await call.message.answer(f"{seller_name}\n"
                                       f"Назначен на должность Продавец.\n"
-                                      f"Привязать его к локации Вы можете командой /change_seller_location")
+                                      f"{attention_em} Привязать его к локации Вы можете командой "
+                                      f"/change_seller_location")
         except Exception as err:
             logging.error(err)
-            await call.message.answer("Добавил в базу, но не смог отправить ему сообщение. Возможно, он не написал "
-                                      "ничего боту.\n"
+            await call.message.answer(f"{error_em} Добавил в базу, но не смог отправить ему сообщение. Возможно, он не "
+                                      f"написал ничего боту.\n"
                                       f"{seller_name}\n"
                                       f"Назначен на должность Продавец.\n"
-                                      f"Привязать его к локации Вы можете командой /change_seller_location")
+                                      f"{attention_em} Привязать его к локации Вы можете командой /change_seller_location")
         await state.finish()
     else:
-        await call.message.answer('Продавец с таким telegramID уже существует.')
+        await call.message.answer(f'{error_em} Продавец с таким telegramID уже существует.')
         await state.finish()
 
 
@@ -1466,12 +1925,12 @@ async def get_location_for_seller(call: CallbackQuery, callback_data: dict, stat
         except Exception as err:
             logging.error(err)
             await call.message.answer(f'{seller_name} назначен продавцом в локации "{location_name}"\n'
-                                      "Добавил его в таблицу, но не смог отправить ему уведомление"
+                                      f"{error_em} Добавил его в таблицу, но не смог отправить ему уведомление"
                                       ". Возможно, он не отправил боту сообщение.\n"
                                       "Вы в главном меню")
         await state.finish()
     else:
-        await call.message.answer('Продавец с таким telegramID уже существует.')
+        await call.message.answer(f'{error_em} Продавец с таким telegramID уже существует.')
         await state.finish()
 
 
@@ -1481,11 +1940,12 @@ async def remove_seller_by_id(message: types.Message, state: FSMContext):
     try:
         seller_id = int(message.text.split('_')[-1])
         await db.delete_seller_by_id(seller_id)
-        await message.answer('Продавец удален. Чтобы удалить еще одного снова введите /remove_seller')
+        await message.answer('Продавец удален. \n'
+                             f'{attention_em} Чтобы удалить еще одного снова введите /remove_seller')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1496,7 +1956,8 @@ async def get_courier_name(message: types.Message, state: FSMContext):
     await state.update_data(name=name)
     await message.answer(f"Отлично!\n"
                          f"Имя курьера - {name}\n"
-                         f"Теперь введите telegramID курьера. Взять id сотрудник может в этом боте @myidbot\n"
+                         f"Теперь введите telegramID курьера. \n"
+                         f"{attention_em} Взять id сотрудник может в этом боте @myidbot\n"
                          f"{attention_em_red} Пользователю будет отправлено сообщение о назначении должности. "
                          f"Поэтому он должен отправить боту хотя бы одно сообщение перед назначением.",
                          reply_markup=cancel_admin_markup)
@@ -1530,17 +1991,17 @@ async def add_courier_without_location(call: CallbackQuery, state: FSMContext):
             await bot.send_message('Вам назначена должность "Курьер". Пока Вы не закреплены за локацией')
             await call.message.answer(f"{courier_name}\n"
                                       f"Назначен на должность Курьер.\n"
-                                      f"Привязать его к локации Вы можете командой /change_courier_location")
+                                      f"{attention_em} Привязать его к локации Вы можете командой /change_courier_location")
         except Exception as err:
             logging.error(err)
-            await call.message.answer("Добавил в базу, но не смог отправить ему сообщение. Возможно, он не написал "
-                                      "ничего боту.\n"
+            await call.message.answer(f"{error_em} Добавил в базу, но не смог отправить ему сообщение. Возможно, он не"
+                                      f" написал ничего боту.\n"
                                       f"{courier_name}\n"
                                       f"Назначен на должность Курьер.\n"
-                                      f"Привязать его к локации Вы можете командой /change_courier_location")
+                                      f"{attention_em} Привязать его к локации Вы можете командой /change_courier_location")
         await state.finish()
     else:
-        await call.message.answer('Курьер с таким telegramID уже существует.')
+        await call.message.answer(f'{error_em} Курьер с таким telegramID уже существует.')
         await state.finish()
 
 
@@ -1574,12 +2035,12 @@ async def get_location_for_seller(call: CallbackQuery, callback_data: dict, stat
         except Exception as err:
             logging.error(err)
             await call.message.answer(f'{courier_name} назначен продавцом в локации "{location_name}"\n'
-                                      "Добавил его в таблицу, но не смог отправить ему уведомление"
+                                      f"{error_em} Добавил его в таблицу, но не смог отправить ему уведомление"
                                       ". Возможно, он не отправил боту сообщение.\n"
                                       "Вы в главном меню")
         await state.finish()
     else:
-        await call.message.answer('Курьер с таким telegramID уже существует.')
+        await call.message.answer(f'{error_em} Курьер с таким telegramID уже существует.')
         await state.finish()
 
 
@@ -1589,11 +2050,12 @@ async def remove_courier_by_id(message: types.Message, state: FSMContext):
     try:
         courier_id = int(message.text.split('_')[-1])
         await db.delete_courier_by_id(courier_id)
-        await message.answer('Курьер удален. Чтобы удалить еще одного снова введите /remove_courier')
+        await message.answer('Курьер удален. \n'
+                             f'{attention_em} Чтобы удалить еще одного снова введите /remove_courier')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1603,12 +2065,12 @@ async def reset_seller_admin_by_id(message: types.Message, state: FSMContext):
     try:
         seller_admin_id = int(message.text.split('_')[-1])
         await db.reset_seller_admin_by_id(seller_admin_id)
-        await message.answer('Админ локации откреплен от локации.'
-                             ' Чтобы открепить еще одного снова введите /reset_seller_admin_location')
+        await message.answer('Админ локации откреплен от локации.\n'
+                             f'{attention_em} Чтобы открепить еще одного снова введите /reset_seller_admin_location')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1618,12 +2080,12 @@ async def reset_seller_by_id(message: types.Message, state: FSMContext):
     try:
         seller_id = int(message.text.split('_')[-1])
         await db.reset_seller_by_id(seller_id)
-        await message.answer('Продавец откреплен от локации.'
-                             ' Чтобы открепить еще одного снова введите /reset_seller_location')
+        await message.answer('Продавец откреплен от локации.\n'
+                             f'{attention_em} Чтобы открепить еще одного снова введите /reset_seller_location')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1633,12 +2095,12 @@ async def reset_courier_by_id(message: types.Message, state: FSMContext):
     try:
         courier_id = int(message.text.split('_')[-1])
         await db.reset_courier_by_id(courier_id)
-        await message.answer('Курьер откреплен от локации.'
-                             ' Чтобы открепить еще одного снова введите /reset_courier_location')
+        await message.answer('Курьер откреплен от локации.\n'
+                             f'{attention_em} Чтобы открепить еще одного снова введите /reset_courier_location')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1650,12 +2112,12 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
         category_id = int(message.text.split('_')[-1])
         await db.remove_from_stock_category(category_id)
         await message.answer('Категория снята с продажи\n'
-                             'Чтобы снять еще одну снова введите /remove_category_from_stock\n'
-                             'Чтобы вернуть в продажу введите /return_category_to_stock')
+                             f'{attention_em} Чтобы снять еще одну снова введите /remove_category_from_stock\n'
+                             f'{attention_em} Чтобы вернуть в продажу введите /return_category_to_stock')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1667,12 +2129,12 @@ async def remove_category_from_stock_by_id(message: types.Message, state: FSMCon
         category_id = int(message.text.split('_')[-1])
         await db.return_to_stock_category(category_id)
         await message.answer('Категория возвращена в продажу\n'
-                             'Чтобы вернуть еще одну снова введите /return_category_to_stock\n'
-                             'Чтобы убрать из продажи введите /remove_category_from_stock')
+                             f'{attention_em} Чтобы вернуть еще одну снова введите /return_category_to_stock\n'
+                             f'{attention_em} Чтобы убрать из продажи введите /remove_category_from_stock')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1700,12 +2162,12 @@ async def remove_item_from_stock_by_id(message: types.Message, state: FSMContext
         product_id = int(message.text.split('_')[-1])
         await db.remove_from_stock_item(product_id)
         await message.answer('Товар снят с продажи\n'
-                             'Чтобы снять еще один снова введите /remove_item_from_stock\n'
-                             'Чтобы вернуть в продажу введите /return_item_to_stock')
+                             f'{attention_em} Чтобы снять еще один снова введите /remove_item_from_stock\n'
+                             f'{attention_em} Чтобы вернуть в продажу введите /return_item_to_stock')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1733,12 +2195,12 @@ async def return_item_to_stock_by_id(message: types.Message, state: FSMContext):
         product_id = int(message.text.split('_')[-1])
         await db.return_to_stock_item(product_id)
         await message.answer('Товар возвращен в продажу\n'
-                             'Чтобы вернуть еще один снова введите /return_item_to_stock\n'
-                             'Чтобы убрать из продажи введите /remove_item_from_stock')
+                             f'{attention_em} Чтобы вернуть еще один снова введите /return_item_to_stock\n'
+                             f'{attention_em} Чтобы убрать из продажи введите /remove_item_from_stock')
         await state.finish()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1753,7 +2215,7 @@ async def change_seller_admin_location_by_id(message: types.Message, state: FSMC
         await AddAdmin.ChangeSellerAdminMetro.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1783,7 +2245,7 @@ async def change_seller_admin_location(call: CallbackQuery, callback_data: dict,
                                f"Вы перезакреплены в локацию № {location_id}")
     except Exception as err:
         logging.error(err)
-        await call.message.answer('Не далось отправить сообщение админу локации.')
+        await call.message.answer(f'{error_em} Не далось отправить сообщение админу локации.')
     await call.message.answer(f'{seller_info["admin_seller_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
 
@@ -1799,7 +2261,7 @@ async def change_seller_location_by_id(message: types.Message, state: FSMContext
         await AddAdmin.ChangeSellerMetro.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1829,7 +2291,7 @@ async def change_seller_location(call: CallbackQuery, callback_data: dict, state
                                f"Вы перезакреплены в локацию № {location_id}")
     except Exception as err:
         logging.error(err)
-        await call.message.answer('Не удалось отправить уведомление продавцу.')
+        await call.message.answer(f'{error_em} Не удалось отправить уведомление продавцу.')
     await call.message.answer(f'{seller_info["seller_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
 
@@ -1845,7 +2307,7 @@ async def change_courier_location_by_id(message: types.Message, state: FSMContex
         await AddAdmin.ChangeCourierMetro.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Неизвестная команда',
+        await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
 
@@ -1875,7 +2337,7 @@ async def change_courier_location(call: CallbackQuery, callback_data: dict, stat
                                f"Вы перезакреплены в точку продаж № {location_id}")
     except Exception as err:
         logging.error(err)
-        await call.message.answer('Не удалось отправить уведомление курьеру.')
+        await call.message.answer(f'{error_em} Не удалось отправить уведомление курьеру.')
     await call.message.answer(f'{courier_info["courier_name"]} перезакреплен в локацию № {location_id}')
     await state.finish()
 
@@ -1942,7 +2404,7 @@ async def edit_item_by_id(message: types.Message, state: FSMContext):
         await AddAdmin.EditItemByWaitSubject.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Не получается отправить информацию о товаре\n'
+        await message.answer(f'{error_em} Не получается отправить информацию о товаре\n'
                              'Если он был добавлен через базу данных, возможно, неправильно '
                              'заполнено поле product_photo_id',
                              reply_markup=cancel_admin_markup)
@@ -2069,9 +2531,9 @@ async def get_new_item_photo(message: types.Message, state: FSMContext):
 async def edit_item_prices(call: CallbackQuery):
     """Меняем цены товара"""
     await call.message.edit_reply_markup()
-    await call.message.answer('Введите новые цены товара ЧЕРЕЗ ЗАПЯТУЮ\n'
-                              'Пример:\n'
-                              '250, 240, 230, 220, 210, 205',
+    await call.message.answer(f'Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                              f'Пример:\n'
+                              f"250,240,230,220,210,205",
                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                   [
                                       back_button
@@ -2085,7 +2547,7 @@ async def get_new_item_prices(message: types.Message, state: FSMContext):
     """Получаем новые цены товара"""
     prices = message.text
     try:
-        list_of_prices = prices.split(', ')
+        list_of_prices = prices.split(',')
         prices = {
             'price1': int(list_of_prices[0]),
             'price2': int(list_of_prices[1]),
@@ -2116,9 +2578,9 @@ async def get_new_item_prices(message: types.Message, state: FSMContext):
         await AddAdmin.EditItemByWaitSubject.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Попробуйте ввести цены еще раз.\n'
-                             'Пример:\n'
-                             '250, 240, 230, 220, 210, 205',
+        await message.answer(f'{error_em} Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                             f'Пример:\n'
+                             f"250,240,230,220,210,205",
                              reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                  [
                                      back_button
@@ -2290,9 +2752,9 @@ async def get_new_size_name(message: types.Message, state: FSMContext):
     new_size_name = message.text
     await state.update_data(new_size_name=new_size_name)
     await message.answer(f"Название размера: {new_size_name}.\n"
-                         f"Теперь введите цены ЧЕРЕЗ ЗАПЯТУЮ.\n"
-                         f"Пример:\n"
-                         f"200, 190, 180, 170, 160, 150\n",
+                         f'Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                         f'Пример:\n'
+                         f"250,240,230,220,210,205",
                          reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                              [
                                  InlineKeyboardButton(
@@ -2310,7 +2772,7 @@ async def get_prices_for_new_size(message: types.Message, state: FSMContext):
     """Получаем список цен"""
     prices = message.text
     try:
-        list_of_prices = prices.split(', ')
+        list_of_prices = prices.split(',')
         prices = {
             'price1': int(list_of_prices[0]),
             'price2': int(list_of_prices[1]),
@@ -2375,9 +2837,9 @@ async def get_prices_for_new_size(message: types.Message, state: FSMContext):
         await AddAdmin.EditItemBySizes.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Попробуйте ввести цены еще раз.\n'
-                             'Пример:\n'
-                             '250, 240, 230, 220, 210, 205',
+        await message.answer(f'{error_em} Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                             f'Пример:\n'
+                             f"250,240,230,220,210,205",
                              reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                  [
                                      back_button
@@ -2586,9 +3048,9 @@ async def edit_size_prices(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     size_name = data.get('size_name')
     await call.message.answer(f'Название размера - {size_name}\n'
-                              f'Введите новые цены ЧЕРЕЗ ЗАПЯТУЮ\n'
-                              f"Пример:\n"
-                              f"200, 190, 180, 170, 160, 150\n",
+                              f'Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                              f'Пример:\n'
+                              f"250,240,230,220,210,205",
                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                   [
                                       InlineKeyboardButton(
@@ -2605,7 +3067,7 @@ async def get_new_size_prices(message: types.Message, state: FSMContext):
     """ПОлучаем новые цены"""
     prices = message.text
     try:
-        list_of_prices = prices.split(', ')
+        list_of_prices = prices.split(',')
         prices = {
             'price1': int(list_of_prices[0]),
             'price2': int(list_of_prices[1]),
@@ -2650,9 +3112,9 @@ async def get_new_size_prices(message: types.Message, state: FSMContext):
         await AddAdmin.EditItemEditSizeById.set()
     except Exception as err:
         logging.error(err)
-        await message.answer('Попробуйте ввести цены еще раз.\n'
-                             'Пример:\n'
-                             '250, 240, 230, 220, 210, 205',
+        await message.answer(f'{error_em} Введите 6 новых цен товара ЧЕРЕЗ ЗАПЯТУЮ\n'
+                             f'Пример:\n'
+                             f"250,240,230,220,210,205",
                              reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                  [
                                      back_button
@@ -2793,6 +3255,8 @@ async def back_to_edit(call: CallbackQuery, state: FSMContext):
     await AddAdmin.EditItemByWaitSubject.set()
 
 
+@dp.callback_query_handler(text='back', state=[AddAdmin.TakeOrders,
+                                               AddAdmin.ConfirmDeliveryOrders])
 @dp.callback_query_handler(text='cancel', state=[AddAdmin.EditItemByWaitSubject,
                                                  AddAdmin.EditItemById,
                                                  AddAdmin.EditItem,
@@ -2833,7 +3297,6 @@ async def back_to_edit(call: CallbackQuery, state: FSMContext):
                                                  AddAdmin.SellerName,
                                                  AddAdmin.SellerID,
                                                  AddAdmin.SellerMetro,
-                                                 AddAdmin.AdminSellerLocation,
                                                  AddAdmin.RemoveSeller,
                                                  AddAdmin.CourierName,
                                                  AddAdmin.CourierID,
@@ -2864,7 +3327,17 @@ async def back_to_edit(call: CallbackQuery, state: FSMContext):
                                                  AddAdmin.PromoConfirm,
                                                  AddAdmin.BanReason,
                                                  AddAdmin.BanID,
-                                                 AddAdmin.UnBanID])
+                                                 AddAdmin.UnBanID,
+                                                 AddAdmin.SellerLocation,
+                                                 AddAdmin.DeliveryCategoryName,
+                                                 AddAdmin.DeliveryItemCategory,
+                                                 AddAdmin.DeliveryItemName,
+                                                 AddAdmin.DeliveryItemPrice,
+                                                 AddAdmin.RemoveDeliveryCategory,
+                                                 AddAdmin.RemoveDeliveryItemCat,
+                                                 AddAdmin.RemoveDeliveryItem,
+                                                 AddAdmin.RemoveDeliveryItemFromStockCategory,
+                                                 AddAdmin.RemoveDeliveryItemFromStockProduct])
 async def cancel_add_admin(call: CallbackQuery, state: FSMContext):
     """Кнопка отмены"""
     await call.message.edit_reply_markup()

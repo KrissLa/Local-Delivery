@@ -8,6 +8,7 @@ from keyboards.inline.callback_datas import bonuses_data, cancel_bonus_order_dat
 from keyboards.inline.inline_keyboards import back_cancel_bonus_markup
 from loader import dp, db, bot
 from states.bonus_state import Bonus
+from utils.emoji import attention_em, error_em
 from utils.send_messages import send_message_to_sellers_bonus
 
 
@@ -39,7 +40,7 @@ async def back_to_bonus(call: CallbackQuery, state: FSMContext):
     await call.message.answer(f'Пригласите друга и после первого заказа мы подарим Вам 1 ролл на Ваш выбор.\n'
                               f'\n'
                               f'Мы также будем дарить Вам по 1 роллу с каждого 10 заказа любого из Ваших друзей.\n\n'
-                              f'! Промо акция действует бессрочно и только при заказе через данный сервисный бот.\n\n'
+                              f'{attention_em} Промо акция действует бессрочно и только при заказе через данный сервисный бот.\n\n'
                               f'Ваша реферальная ссылка:\n'
                               f'http://t.me/{bot_user.username}?start={call.from_user.id}',
                               reply_markup=InlineKeyboardMarkup(
@@ -85,12 +86,12 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
     try:
         quantity = int(message.text)
         if quantity > count_bonus:
-            await message.answer('Напишите количество.\n'
+            await message.answer(f'{error_em} Напишите количество.\n'
                                  f"Вам доступно - {count_bonus} шт.",
                                  reply_markup=back_cancel_bonus_markup)
             await Bonus.Count.set()
         elif quantity == 0:
-            await message.answer('Введите что-то кроме 0.\n'
+            await message.answer(f'{error_em} Введите что-то кроме 0.\n'
                                  f"Вам доступно - {count_bonus} шт.",
                                  reply_markup=back_cancel_bonus_markup)
             await Bonus.Count.set()
@@ -107,7 +108,7 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
             if sellers_list:
                 await message.answer(f'Ваш заказ № {bonus_order_info["bonus_order_id"]}Б сформирован - '
                                      f'{bonus_order_info["bonus_quantity"]} шт.\n'
-                                     f'Пожалуйста, покажите это сообщение продавцу',
+                                     f'{attention_em} Пожалуйста, покажите это сообщение продавцу',
                                      reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                          [
                                              InlineKeyboardButton(
@@ -148,7 +149,8 @@ async def cancel_bonus_order(call: CallbackQuery, callback_data: dict, state: FS
         await state.finish()
         await call.message.answer(f'Ваш заказ № {b_order_id}Б отменен.')
     else:
-        await call.message.answer('Ваш заказ уже подтвержден. Чтобы отменить его, пожалуйста, подойдите к продавцу.')
+        await call.message.answer(f'{error_em} Ваш заказ уже подтвержден. Чтобы отменить его, пожалуйста, подойдите к '
+                                  f'продавцу.')
 
 
 @dp.callback_query_handler(text='return_to_bot', state=Bonus.WaitSeller)

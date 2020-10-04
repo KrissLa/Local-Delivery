@@ -11,10 +11,10 @@ from keyboards.inline.inline_keyboards import generate_keyboard_with_categories,
     generate_keyboard_with_count_and_prices_for_size, delivery_options_markup, \
     order_cancel_or_back_markup, need_pass_markup, \
     build_keyboard_with_time, confirm_order_markup, generate_keyboard_with_none_categories, \
-    generate_keyboard_with_none_products
+    generate_keyboard_with_none_products, back_button
 from loader import dp, db, bot
 from states.menu_states import Menu
-from utils.emoji import attention_em
+from utils.emoji import attention_em, warning_em
 from utils.send_messages import send_message_to_sellers, send_cart
 from utils.temp_orders_list import get_temp_orders_list_message, get_final_price, get_couriers_list
 
@@ -99,7 +99,6 @@ async def get_product_size(call: CallbackQuery, callback_data: dict, state: FSMC
     await call.message.answer("Укажите количество:",
                               reply_markup=await generate_keyboard_with_count_and_prices_for_size(size_info,
                                                                                                   product_id))
-    state_name = await state.get_state()
     if await state.get_state() == 'Menu:WaitProductSize':
         await Menu.WaitQuantity.set()
     else:
@@ -137,7 +136,7 @@ async def get_quantity_more_than_6(message: types.Message, state: FSMContext):
     try:
         quantity = int(message.text)
         if quantity < 6:
-            await message.answer("Пожалуйста, напишите количество товара (6 или больше)")
+            await message.answer(f"{warning_em} Пожалуйста, напишите количество товара (6 или больше)")
             if await state.get_state() == 'Menu:WaitQuantity6BackWithSize':
                 await Menu.WaitQuantity6BackWithSize.set()
             elif await state.get_state() == 'Menu:WaitQuantity6Back':
@@ -177,7 +176,7 @@ async def get_quantity_more_than_6(message: types.Message, state: FSMContext):
                                  reply_markup=delivery_options_markup)
     except Exception as err:
         logging.error(err)
-        await message.answer("Пожалуйста, напишите количество товара (6 или больше)")
+        await message.answer(f"{warning_em} Пожалуйста, напишите количество товара (6 или больше)")
         if await state.get_state() == 'Menu:WaitQuantity6BackWithSize':
             await Menu.WaitQuantity6BackWithSize.set()
         elif await state.get_state() == 'Menu:WaitQuantity6Back':
@@ -228,81 +227,100 @@ async def set_quantity(call: CallbackQuery, callback_data: dict, state: FSMConte
 @dp.callback_query_handler(text='delivery_option_pickup', state=Menu.OneMoreOrNext)
 async def set_pickup(call: CallbackQuery, state: FSMContext):
     """Пользователь выбирает самовывоз"""
-    await call.message.edit_reply_markup()
-    user_id = call.from_user.id
-    user_data = await db.get_user_address_data(user_id)
     st_data = await state.get_data()
-    order_price = st_data.get('final_price')
     list_products = st_data.get('list_products')
-    await db.add_order_pickup(order_user_telegram_id=user_id,
-                              order_metro_id=user_data['user_metro_id'],
-                              order_location_id=user_data['user_location_id'],
-                              order_local_object_id=user_data['user_local_object_id'],
-                              order_local_object_name=user_data['local_object_name'],
-                              delivery_method='Заберу сам',
-                              delivery_address=user_data['location_address'],
-                              order_info=list_products,
-                              order_price=order_price,
-                              order_status='Ожидание пользователя')
-    order_id = await db.get_last_order_id(user_id)
-    await call.message.answer(f'Ваш заказ № {order_id}:\n'
-                              f'{list_products}\n'
-                              f'Адрес самовывоза: {user_data["location_address"]}\n'
-                              f'Сумма заказа - {order_price} руб.\n'
-                              f'Выберите время, через которое необходимо приготовить Ваш заказ:',
-                              reply_markup=await build_keyboard_with_time('pickup', 'back'))
-    await Menu.WaitTime.set()
+    if list_products:
+        await call.message.edit_reply_markup()
+        user_id = call.from_user.id
+        user_data = await db.get_user_address_data(user_id)
+
+        order_price = st_data.get('final_price')
+
+        await db.add_order_pickup(order_user_telegram_id=user_id,
+                                  order_metro_id=user_data['user_metro_id'],
+                                  order_location_id=user_data['user_location_id'],
+                                  order_local_object_id=user_data['user_local_object_id'],
+                                  order_local_object_name=user_data['local_object_name'],
+                                  delivery_method='Заберу сам',
+                                  delivery_address=user_data['location_address'],
+                                  order_info=list_products,
+                                  order_price=order_price,
+                                  order_status='Ожидание пользователя')
+        order_id = await db.get_last_order_id(user_id)
+        await call.message.answer(f'Ваш заказ № {order_id}:\n'
+                                  f'{list_products}\n'
+                                  f'Адрес самовывоза: {user_data["location_address"]}\n'
+                                  f'Сумма заказа - {order_price} руб.\n'
+                                  f'Выберите время, через которое необходимо приготовить Ваш заказ:',
+                                  reply_markup=await build_keyboard_with_time('pickup', 'back'))
+        await Menu.WaitTime.set()
+    else:
+        await call.message.edit_reply_markup()
+        await call.message.answer(f'{warning_em} Для заказа Вам нужно выбрать хотя бы один товар.  Выберите что-то'
+                                  f' из меню.')
 
 
-@dp.callback_query_handler(text='back', state=Menu.WaitPass)
+@dp.callback_query_handler(text='back', state=[Menu.WaitPass,
+                                               Menu.WaitNewAddress])
 @dp.callback_query_handler(text='delivery_option_delivery', state=Menu.OneMoreOrNext)
 async def set_delivery(call: CallbackQuery, state: FSMContext):
     """Пользователь выбирает с доставкой"""
-    await call.message.edit_reply_markup()
-    if await state.get_state() == 'Menu:WaitPass':
-        await call.answer("Вернулись к адресу")
-        await call.message.answer("Вернулись к адресу")
-    user_id = call.from_user.id
-    user_data = await db.get_user_address_data_without_location_address(user_id)
-    await state.update_data(user_local_object_name=user_data['local_object_name'])
     st_data = await state.get_data()
-    order_price = st_data.get('final_price')
     list_products = st_data.get('list_products')
-    await db.add_order(order_user_telegram_id=user_id,
-                       order_metro_id=user_data['user_metro_id'],
-                       order_location_id=user_data['user_location_id'],
-                       order_local_object_id=user_data['user_local_object_id'],
-                       order_local_object_name=user_data['local_object_name'],
-                       delivery_method='С доставкой',
-                       order_info=list_products,
-                       order_price=order_price,
-                       order_status='Ожидание пользователя')
-    order_id = await db.get_last_order_id(user_id)
-    await call.message.answer(f'Ваш заказ № {order_id}:\n'
-                              f'{list_products}\n'
-                              f'Адрес доставки: {user_data["local_object_name"]}\n'
-                              f'Сумма заказа - {order_price} руб.')
-    if user_data['user_address'] is None:
-        await call.message.answer('Напишите точное место доставки и телефон для связи.\n\n'
-                                  'Пример 1: Подъезд 2, 15 этаж, офис 123, ООО Компания, ФИО покупателя, 89160000000\n\n'
-                                  'Пример 2: Северный вход, у ресепшн, 89160000000.',
-                                  reply_markup=order_cancel_or_back_markup)
+    if list_products:
+        order_price = st_data.get('final_price')
+        await call.message.edit_reply_markup()
+        if await state.get_state() == 'Menu:WaitPass':
+            await call.answer("Вернулись к адресу")
+            await call.message.answer("Вернулись к адресу")
+        user_id = call.from_user.id
+        user_data = await db.get_user_address_data_without_location_address(user_id)
+        await state.update_data(user_local_object_name=user_data['local_object_name'])
+
+        await db.add_order(order_user_telegram_id=user_id,
+                           order_metro_id=user_data['user_metro_id'],
+                           order_location_id=user_data['user_location_id'],
+                           order_local_object_id=user_data['user_local_object_id'],
+                           order_local_object_name=user_data['local_object_name'],
+                           delivery_method='С доставкой',
+                           order_info=list_products,
+                           order_price=order_price,
+                           order_status='Ожидание пользователя')
+        order_id = await db.get_last_order_id(user_id)
+        await call.message.answer(f'Ваш заказ № {order_id}:\n'
+                                  f'{list_products}\n'
+                                  f'Адрес доставки: {user_data["local_object_name"]}\n'
+                                  f'Сумма заказа - {order_price} руб.')
+        if user_data['user_address'] is None:
+            await call.message.answer('Напишите точное место доставки и телефон для связи.\n\n'
+                                      'Пример 1: Подъезд 2, 15 этаж, офис 123, ООО Компания, ФИО покупателя, 89160000000\n\n'
+                                      'Пример 2: Северный вход, у ресепшн, 89160000000.',
+                                      reply_markup=order_cancel_or_back_markup)
+        else:
+            await state.update_data(address=user_data['user_address'])
+            await call.message.answer(f"Использовать адрес предыдущего заказа?\n{user_data['user_address']}",
+                                      reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                          [
+                                              InlineKeyboardButton(
+                                                  text='Да, использовать адрес',
+                                                  callback_data='use_previous_address'
+                                              )
+                                          ],
+                                          [
+                                              InlineKeyboardButton(
+                                                  text='Ввести новый адрес',
+                                                  callback_data='input_new_address'
+                                              )
+                                          ],
+                                          [
+                                              back_button
+                                          ]
+                                      ]))
+        await Menu.WaitAddress.set()
     else:
-        await state.update_data(address=user_data['user_address'])
-        await call.message.answer(f"Использовать адрес предыдущего заказа?\n{user_data['user_address']}",
-                                  reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                      [
-                                          InlineKeyboardButton(
-                                              text='Да',
-                                              callback_data='use_previous_address'
-                                          )
-                                      ]
-                                  ]))
-        await call.message.answer('Или напишите точное место доставки и телефон для связи.\n\n'
-                                  'Пример 1: Подъезд 2, 15 этаж, офис 123, ООО Компания, ФИО покупателя, 89160000000\n\n'
-                                  'Пример 2: Северный вход, у ресепшн, 89160000000.',
-                                  reply_markup=order_cancel_or_back_markup)
-    await Menu.WaitAddress.set()
+        await call.message.edit_reply_markup()
+        await call.message.answer(f'{warning_em} Для заказа Вам нужно выбрать хотя бы один товар. Выберите что-то из'
+                                  f' меню.')
 
 
 @dp.callback_query_handler(text='use_previous_address', state=Menu.WaitAddress)
@@ -331,7 +349,18 @@ async def use_previous_address(call: CallbackQuery, state: FSMContext):
     await Menu.WaitPass.set()
 
 
-@dp.message_handler(state=Menu.WaitAddress)
+@dp.callback_query_handler(text='input_new_address', state=Menu.WaitAddress)
+async def use_previous_address(call: CallbackQuery, state: FSMContext):
+    """Просим ввести новый адрес"""
+    await call.message.edit_reply_markup()
+    await call.message.answer('Напишите точное место доставки и телефон для связи.\n\n'
+                              'Пример 1: Подъезд 2, 15 этаж, офис 123, ООО Компания, ФИО покупателя, 89160000000\n\n'
+                              'Пример 2: Северный вход, у ресепшн, 89160000000.',
+                              reply_markup=order_cancel_or_back_markup)
+    await Menu.WaitNewAddress.set()
+
+
+@dp.message_handler(state=Menu.WaitNewAddress)
 async def get_user_address(message: types.Message):
     """Получаем адес доставки от пользователя"""
     address = message.text
@@ -427,7 +456,7 @@ async def user_confirm_order(call: CallbackQuery, state: FSMContext):
         await state.finish()
     else:
         await call.message.answer(f"Извините. Не нашел доступных продавцов.\n"
-                                  f"Ваши товары помещены в корзину: /cart\n"
+                                  f"{attention_em} Ваши товары помещены в корзину: /cart\n"
                                   f"Если Вы считаете что произошла ошибка, пожалуйста свяжитесь с нами.")
 
         await state.finish()

@@ -1,10 +1,14 @@
+import logging
+
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 
-from keyboards.inline.callback_datas import page_call_data
+from keyboards.inline.callback_datas import page_call_data, metro_del_data
 from keyboards.inline.inline_keyboards import generate_key_board_with_admins, generate_key_board_with_metro, \
     generate_key_board_with_locations, generate_keyboard_with_categories_for_add_item, get_available_local_objects, \
-    generate_keyboard_with_categories, generate_keyboard_with_products, get_available_local_objects_profile
+    generate_keyboard_with_categories, generate_keyboard_with_products, get_available_local_objects_profile, \
+    generate_keyboard_with_metro_for_seller_admin, generate_keyboard_with_metro, generate_keyboard_with_metro_profile, \
+    generate_keyboard_with_delivery_categories_for_add_item
 from loader import dp, db
 from states.admin_state import AddAdmin
 from states.menu_states import SignUpUser, Menu
@@ -21,11 +25,41 @@ async def get_admin_pagination_list(call: CallbackQuery, callback_data: dict):
 
 @dp.callback_query_handler(page_call_data.filter(), state=[AddAdmin.WaitDeleteMetro,
                                                            AddAdmin.NewLocationMetro,
-                                                           AddAdmin.LocalObjectMetro])
+                                                           AddAdmin.LocalObjectMetro,
+                                                           AddAdmin.EditMetro,
+                                                           AddAdmin.ChangeSellerAdminMetro,
+                                                           AddAdmin.ChangeSellerMetro,
+                                                           AddAdmin.ChangeCourierMetro])
 async def get_metro_pagination_list(call: CallbackQuery, callback_data: dict):
     """Пагинация списка метро"""
     page = int(callback_data.get('page'))
     await call.message.edit_reply_markup(await generate_key_board_with_metro(page))
+
+
+@dp.callback_query_handler(page_call_data.filter(), state=[AddAdmin.AdminSellerMetro,
+                                                           AddAdmin.SellerMetro,
+                                                           AddAdmin.CourierMetro])
+async def get_metro_pagination_list(call: CallbackQuery, callback_data: dict):
+    """Пагинация списка метро"""
+    page = int(callback_data.get('page'))
+    logging.info(page)
+    await call.message.edit_reply_markup(await generate_keyboard_with_metro_for_seller_admin(page))
+
+
+@dp.callback_query_handler(page_call_data.filter(), state=[SignUpUser.Metro,])
+async def get_metro_pagination_list(call: CallbackQuery, callback_data: dict):
+    """Пагинация списка метро"""
+    page = int(callback_data.get('page'))
+    logging.info(page)
+    await call.message.edit_reply_markup(await generate_keyboard_with_metro(page))
+
+
+@dp.callback_query_handler(page_call_data.filter(), state=[ProfileState.WaitMetro])
+async def get_metro_pagination_list(call: CallbackQuery, callback_data: dict):
+    """Пагинация списка метро"""
+    page = int(callback_data.get('page'))
+    logging.info(page)
+    await call.message.edit_reply_markup(await generate_keyboard_with_metro_profile(page))
 
 
 @dp.callback_query_handler(page_call_data.filter(), state=[AddAdmin.AdminSellerLocation,
@@ -120,6 +154,16 @@ async def get_category_pagination_list(call: CallbackQuery, callback_data: dict)
     category_list = await db.get_category_for_admin()
     page = int(callback_data.get('page'))
     await call.message.edit_reply_markup(await generate_keyboard_with_categories_for_add_item(category_list, page))
+
+
+@dp.callback_query_handler(page_call_data.filter(), state=[AddAdmin.DeliveryItemCategory,
+                                                           AddAdmin.RemoveDeliveryItemCat,
+                                                           AddAdmin.RemoveDeliveryItemFromStockCategory])
+async def get_category_pagination_list(call: CallbackQuery, callback_data: dict):
+    """Пагинация списка категорий"""
+    category_list = await db.get_list_of_delivery_categories()
+    page = int(callback_data.get('page'))
+    await call.message.edit_reply_markup(await generate_keyboard_with_delivery_categories_for_add_item(category_list, page))
 
 
 @dp.callback_query_handler(page_call_data.filter(), state=AddAdmin.EditItem)

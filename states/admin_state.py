@@ -43,16 +43,15 @@ class AddAdmin(StatesGroup):
 
     ItemCategory = State()
     ItemName = State()
-    ItemPhoto =State()
-    ItemDescription =State()
-    ItemSize =State()
-    ItemPrice =State()
+    ItemPhoto = State()
+    ItemDescription = State()
+    ItemSize = State()
+    ItemPrice = State()
     ItemConfirm = State()
 
     ItemSizeNameFirst = State()
     ItemSizePriceFirst = State()
     ItemSizeConfirmFirst = State()
-
 
     ItemSizeName = State()
     ItemSizePrice = State()
@@ -62,7 +61,6 @@ class AddAdmin(StatesGroup):
 
     RemoveItemCategory = State()
     RemoveItem = State()
-
 
     AdminSellerName = State()
     AdminSellerID = State()
@@ -90,7 +88,6 @@ class AddAdmin(StatesGroup):
 
     RemoveCategoryFromStocks = State()
     ReturnCategoryToStocks = State()
-
 
     ReturnItemToStockCategory = State()
     ReturnItemToStockProduct = State()
@@ -123,7 +120,6 @@ class AddAdmin(StatesGroup):
     EditItemByAvailability = State()
     EditItemBySizes = State()
 
-
     EditItemNewSizeName = State()
     EditItemNewSizePrices = State()
 
@@ -135,4 +131,19 @@ class AddAdmin(StatesGroup):
     EditItemEditSizeByIdName = State()
     EditItemEditSizeByIdPrices = State()
 
+    DeliveryCategoryName = State()
+    DeliveryItemCategory = State()
+    DeliveryItemName = State()
+    DeliveryItemPrice = State()
+
+    TakeOrders = State()
+    ConfirmDeliveryOrders = State()
+    TakeOrdersWait = State()
+
+    RemoveDeliveryCategory = State()
+    RemoveDeliveryItemCat = State()
+    RemoveDeliveryItem = State()
+
+    RemoveDeliveryItemFromStockCategory = State()
+    RemoveDeliveryItemFromStockProduct = State()
 

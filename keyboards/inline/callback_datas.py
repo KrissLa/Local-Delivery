@@ -6,9 +6,16 @@ local_object_data = CallbackData('set_local_object', 'local_object_id')
 
 categories_data = CallbackData('set_category', 'category_id')
 
+
+delivery_categories_data = CallbackData('deliv_category', 'category_id')
+
 product_list_data = CallbackData('set_product', 'product_id')
 
+delivery_product_data = CallbackData('deliv_product', 'product_id', 'price')
+
 product_count_price_data = CallbackData('product_quantity', 'quantity', 'price')
+
+delivery_product_count_data = CallbackData('deliv_quantity', 'quantity', 'price')
 
 deliver_to_time_data = CallbackData('deliver_ro', 'time', 'value', 'del_type')
 
@@ -63,3 +70,15 @@ page_call_data = CallbackData('next', 'page')
 back_data = CallbackData('back', 'page')
 
 remove_from_cart_data = CallbackData('remove_fc', 'order_id')
+
+cancel_order_data = CallbackData('cancel_order', 'order_id')
+
+delivery_date_data = CallbackData('date_data', 'date', 'weekday')
+
+delivery_time_data = CallbackData('time_data', 'time', "choice")
+
+take_delivery_order = CallbackData('take', 'order_id')
+
+confirm_delivery_order = CallbackData('confirm', 'order_id')
+
+dont_take_delivery_order = CallbackData('dont_take', 'order_id')

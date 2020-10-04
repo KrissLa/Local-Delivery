@@ -1,3 +1,4 @@
+import logging
 import math
 
 import emoji
@@ -9,8 +10,9 @@ from keyboards.inline.callback_datas import page_call_data
 
 async def add_pagination(buttons_list, page):
     """Добавляем пагинацию к клавиатуре"""
-    last_page = math.ceil(len(buttons_list) / 2) - 1
-    page_data = paginate(buttons_list, page=page, limit=15)
+    last_page = math.ceil(len(buttons_list) / 10) - 1
+    logging.info(len(buttons_list))
+    page_data = paginate(buttons_list, page=page, limit=10)
     if page == 0:
         page_data.append([
             InlineKeyboardButton(text=emoji.emojize(f':arrow_right:', use_aliases=True),

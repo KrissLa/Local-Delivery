@@ -89,7 +89,10 @@ async def bot_help(message: types.Message, state: FSMContext):
         '9. Убрать категорию из меню - /remove_category_from_stock',
         '10. Вернуть категорию в меню - /return_category_to_stock',
         '11. Убрать товар из меню - /remove_item_from_stock',
-        '12. Вернуть товар в меню - /return_item_to_stock',
+        '12. Вернуть товар в меню - /return_item_to_stock\n',
+        'Работа с оптовыми заказами',
+        '13. Создать новый заказ на поставку - /new_delivery_order',
+        '14. Посмотреть/изменить/отменить заказы на поставку - /change_delivery_order',
     ]
     await message.answer('\n'.join(text))
 

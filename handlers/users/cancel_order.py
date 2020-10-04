@@ -4,6 +4,7 @@ from aiogram.types import CallbackQuery
 
 from filters.users_filters import IsAdminMessage, IsBanned
 from keyboards.default.menu import menu_keyboard
+from keyboards.inline.callback_datas import cancel_order_data
 from loader import dp, db
 from utils.misc import rate_limit
 
@@ -106,3 +107,9 @@ async def cancel_admin(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Операция прервана\n'
                               'Вы в главном меню',
                               reply_markup=menu_keyboard)
+
+
+# @dp.callback_query_handler(cancel_order_data.filter())
+# async def confirm_cancel_order(call: CallbackQuery, callback_data: dict):
+#     """Получаем подтверждение на отмену зкакза"""
+

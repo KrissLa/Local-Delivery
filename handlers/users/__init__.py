@@ -6,8 +6,6 @@ from .cart import dp
 from .commands import dp
 from .paginations import dp
 from .help import dp
-
-
 from .restart_and_menu import dp
 from .couriers import dp
 from .sellers import dp
