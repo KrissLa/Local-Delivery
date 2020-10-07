@@ -1,9 +1,13 @@
+import logging
+
+from keyboards.default.menu import menu_keyboard
 from loader import db
 from states.admin_state import AddAdmin
 from states.bonus_state import Bonus
 from states.menu_states import Menu, SignUpUser
 from states.profile_states import ProfileState
 from states.seller_admin_states import SellerAdmin
+from states.sellers_states import SelectCourier
 
 states_for_menu = [ProfileState.WaitAddress,
                    Menu.WaitAddress,
@@ -96,7 +100,13 @@ states_for_menu = [ProfileState.WaitAddress,
                    SellerAdmin.ConfirmTempOrderRemoved,
                    SellerAdmin.DeliveryDate,
                    SellerAdmin.DeliveryTime,
-                   SellerAdmin.ConfirmOrder]
+                   SellerAdmin.ConfirmOrder,
+                   Menu.OrderStatus,
+                   Menu.WaitReasonUser,
+                   SelectCourier.WaitReasonCourier,
+                   Menu.WaitReview,
+                   SelectCourier.WaitReasonActive,
+                   SelectCourier.WaitReason]
 
 
 async def reset_state(state, message):
@@ -138,8 +148,17 @@ async def reset_state(state, message):
                                    'AddAdmin:DeliveryItemPrice', 'SellerAdmin:ChangeOrder',
                                    'SellerAdmin:ChangeDeliveryDate',
                                    'SellerAdmin:WaitCancelConfirm', 'SellerAdmin:ChangeDeliveryTime',
-                                   'SellerAdmin:ChangeDeliveryConfirm', 'SellerAdmin:ChangeDeliveryWaitConfirm',]:
+                                   'SellerAdmin:ChangeDeliveryConfirm', 'SellerAdmin:ChangeDeliveryWaitConfirm']:
         await state.finish()
+    elif await state.get_state() in ['Menu:OrderStatus', 'Menu:WaitReasonUser', 'SelectCourier:WaitReasonCourier',
+                                     'SelectCourier:WaitReason', 'SelectCourier:WaitReasonActive']:
+        await state.finish()
+        await message.answer('Заказ не отменен',
+                             reply_markup=menu_keyboard)
+    elif await state.get_state() in ['Menu:WaitReview']:
+        await state.finish()
+        await message.answer('Отзыв не сохранен',
+                             reply_markup=menu_keyboard)
     elif await state.get_state() in ['SellerAdmin:DeliveryCategory', 'SellerAdmin:DeliveryProduct',
                                      'SellerAdmin:DeliveryQuantity', 'SellerAdmin:DeliveryQuantity6',
                                      'SellerAdmin:ConfirmTempOrder', 'SellerAdmin:ConfirmTempOrderRemoved',

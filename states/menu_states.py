@@ -42,3 +42,8 @@ class Menu(StatesGroup):
 
     WaitUserConfirmationPickup = State()
     WaitUserConfirmationDelivery = State()
+
+    OrderStatus = State()
+    WaitReasonUser = State()
+
+    WaitReview = State()

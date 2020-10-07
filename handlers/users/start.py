@@ -12,12 +12,14 @@ from keyboards.inline.callback_datas import metro_data, local_object_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_metro, get_available_local_objects
 from loader import dp, db
 from states.menu_states import SignUpUser
+from utils.check_states import reset_state
 from utils.emoji import attention_em
 
 
 @dp.message_handler(CommandStart(deep_link=compile(r'\d\w*')), state=['*'])
 async def bot_start_referal(message: types.Message, state: FSMContext):
     """Отлавливаем реферальные ссылки"""
+    await reset_state(state, message)
     user_id = message.from_user.id
     if await db.get_user(user_id):
         await message.answer('Вы уже зарегистрированы в боте. Пожалуйста, воспользуйтесь командами из меню.',
@@ -51,8 +53,9 @@ async def bot_start_referal(message: types.Message, state: FSMContext):
 @dp.message_handler(HasNoLocation(), IsNotClientMessage(), state=['*'])
 @dp.message_handler(HasNoLocalObject(), IsNotClientMessage(), state=['*'])
 @dp.message_handler(CommandStart(deep_link=None), state=['*'])
-async def bot_start(message: types.Message):
+async def bot_start(message: types.Message, state: FSMContext):
     """Нажатие на старт без реферального кода"""
+    await reset_state(state, message)
     user_id = message.from_user.id
     if await db.get_user(user_id):
         await message.answer('Вы уже зарегистрированы в боте. Пожалуйста, воспользуйтесь командами из меню.',

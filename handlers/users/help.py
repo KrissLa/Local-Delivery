@@ -15,6 +15,7 @@ async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
         'Список команд: ',
+        '0. Если бот завис и не реагирует на Ваши сообщения - /restart',
         '1. Нажать при первом запуске, перед добавлением станций метро, локаций, и объектов доставки'
         ' чтобы бот не ругался на то, что Вы не закреплены за локацией - /first_start\n',
         'Общие команды:',
@@ -80,6 +81,7 @@ async def bot_help(message: types.Message, state: FSMContext):
 
 
 
+
     ]
     await message.answer('\n'.join(text))
 
@@ -91,6 +93,7 @@ async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
         'Общие команды: ',
+        '0. Если бот завис и не реагирует на Ваши сообщения - /restart',
         '1. Получить справку - /help',
         '2. Корзина - /cart',
         '3. Показать меню - /menu',
@@ -119,6 +122,7 @@ async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
         'Общие команды: ',
+        '0. Если бот завис и не реагирует на Ваши сообщения - /restart',
         '1. Получить справку - /help',
         '2. Корзина - /cart',
         '3. Показать меню - /menu',
@@ -142,6 +146,7 @@ async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
         'Общие команды: ',
+        '0. Если бот завис и не реагирует на Ваши сообщения - /restart',
         '1. Получить справку - /help',
         '2. Корзина - /cart',
         '3. Показать меню - /menu',
@@ -163,6 +168,7 @@ async def bot_help(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     text = [
         'Список команд: ',
+        '0. Если бот завис и не реагирует на Ваши сообщения - /restart',
         '1. Получить справку - /help',
         '2. Корзина - /cart',
         '3. Показать меню - /menu',

@@ -36,6 +36,7 @@ async def on_startup(dp):
     await db.create_table_delivery_products()
     await db.create_table_delivery_orders()
     await db.create_table_temp_delivery_orders()
+    await db.create_table_order_products()
     await db.add_admin(admins, 'Главный админ')
     await set_default_commands(dp)
 

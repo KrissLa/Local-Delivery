@@ -35,6 +35,8 @@ couriers_data = CallbackData('couriers', 'courier_tg_id', 'order_id')
 
 active_order_data = CallbackData('active', 'order_id', 'delivery_method', 'user_id')
 
+active_order_cancel_data = CallbackData('active_cancel', 'order_id')
+
 active_bonus_order_data = CallbackData('active_bon', 'order_id', 'user_id')
 
 order_is_delivered = CallbackData('order_is_del', 'order_id', 'user_id')
@@ -82,3 +84,5 @@ take_delivery_order = CallbackData('take', 'order_id')
 confirm_delivery_order = CallbackData('confirm', 'order_id')
 
 dont_take_delivery_order = CallbackData('dont_take', 'order_id')
+
+reviev_order_data = CallbackData('review', 'order_id')

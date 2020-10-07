@@ -134,24 +134,28 @@ async def back_to_one_more_or_next(call: CallbackQuery, state: FSMContext):
     list_products = await get_temp_orders_list_message(temp_orders)
     await state.update_data(list_products=list_products)
     await state.update_data(final_price=final_price)
+    lst_order= await db.get_last_order_id(call.from_user.id)
+    await db.delete_order_by_id(lst_order)
     await call.message.answer(text=f'Сумма заказа - {final_price} руб.\n'
                                    'Оформить заказ\n'
                                    f'{attention_em} Доставка работает в будни с 11 до 17',
                               reply_markup=delivery_options_markup)
+
     await Menu.OneMoreOrNext.set()
 
 
 @dp.callback_query_handler(text='back_to_pass', state=Menu.WaitTime)
-async def back_to_pass(call: CallbackQuery):
+async def back_to_pass(call: CallbackQuery, state: FSMContext):
     """Назад к выбору нужен ли пропуск"""
     await call.message.edit_reply_markup()
-    order_data = await db.get_last_user_order_detail(user_id=call.from_user.id)
-    couriers_list = await db.get_couriers_list(order_data['order_location_id'])
+    data = await state.get_data()
+    order_data = await db.get_last_order_data(user_id=call.from_user.id)
+    couriers_list = await db.get_couriers_list(order_data['location_id'])
     await call.message.answer(f'Ваш заказ № {order_data["order_id"]}:\n'
-                              f'{order_data["order_info"]}\n'
-                              f'Адрес доставки: {order_data["order_local_object_name"]},\n'
-                              f'{order_data["delivery_address"]}\n'
-                              f'Сумма заказа - {order_data["order_price"]} руб.')
+                              f'{data["list_products"]}\n'
+                              f'Адрес доставки: {order_data["local_object_name"]},\n'
+                              f'{order_data["order_address"]}\n'
+                              f'Сумма заказа - {order_data["order_final_price"]} руб.')
     await call.message.answer(f'Внимание! Закажите гостевой пропуск для курьеров в случае необходимости.\n'
                               f'ФИО курьеров:\n{await get_couriers_list(couriers_list)}\n'
                               f'Один из них доставит Вам заказ',
@@ -163,22 +167,23 @@ async def back_to_pass(call: CallbackQuery):
 async def back_to_time(call: CallbackQuery, state: FSMContext):
     """Возвращаемся к клавиатуре с временем"""
     await call.message.edit_reply_markup()
-    order_data = await db.get_last_user_order_detail(user_id=call.from_user.id)
+    data = await state.get_data()
+    order_data = await db.get_last_order_data(user_id=call.from_user.id)
     if await state.get_state() == "Menu:WaitUserConfirmationDelivery":
         order_pass_value = await db.get_order_pass_value(order_data['order_id'])
         await call.message.answer(f'Ваш заказ № {order_data["order_id"]}:\n'
-                                  f'{order_data["order_info"]}\n'
-                                  f'Адрес доставки: {order_data["order_local_object_name"]}, \n'
-                                  f'{order_data["delivery_address"]}\n'
+                                  f'{data["list_products"]}\n'
+                                  f'Адрес доставки: {order_data["local_object_name"]}, \n'
+                                  f'{order_data["order_address"]}\n'
                                   f'{order_pass_value}\n'
-                                  f'Сумма заказа - {order_data["order_price"]} руб.')
+                                  f'Сумма заказа - {order_data["order_final_price"]} руб.')
         await call.message.answer('Выберите время через которое необходимо доставить Ваш заказ:',
                                   reply_markup=await build_keyboard_with_time('delivery', 'back_to_pass'))
     else:
         await call.message.answer(f'Ваш заказ № {order_data["order_id"]}:\n'
-                                  f'{order_data["order_info"]}\n'
-                                  f'Адрес самовывоза: {order_data["delivery_address"]}\n'
-                                  f'Сумма заказа - {order_data["order_price"]} руб.\n'
+                                  f'{data["list_products"]}\n'
+                                  f'Адрес самовывоза: {order_data["order_address"]}\n'
+                                  f'Сумма заказа - {order_data["order_final_price"]} руб.\n'
                                   f'Выберите время, через которое необходимо приготовить Ваш заказ:',
                                   reply_markup=await build_keyboard_with_time('pickup', 'back'))
     await Menu.WaitTime.set()

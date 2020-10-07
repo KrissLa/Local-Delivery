@@ -255,41 +255,95 @@ class Database:
            """
         await self.pool.execute(sql)
 
+    # async def create_table_orders(self):
+    #     """Создаем таблицу заказов"""
+    #     sql = """
+    #        CREATE TABLE IF NOT EXISTS orders (
+    #        order_id SERIAL PRIMARY KEY,
+    #        order_user_telegram_id INT NOT NULL,
+    #        order_metro_id INT NOT NULL,
+    #        order_location_id INT NOT NULL,
+    #        order_local_object_id INT NOT NULL,
+    #        order_local_object_name VARCHAR(255) NOT NULL,
+    #        order_created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+    #        time_for_delivery INT,
+    #        deliver_to TIME,
+    #        delivery_method deliv_method,
+    #        order_pass_for_courier VARCHAR(500),
+    #        order_courier_name VARCHAR(255),
+    #        order_courier_telegram_id INT,
+    #        delivery_address TEXT,
+    #        order_info TEXT,
+    #        order_price INT,
+    #        order_status or_status,
+    #        reason_for_rejection TEXT
+    #        );
+    #        """
+    #     try:
+    #         await self.pool.execute("CREATE TYPE deliv_method AS ENUM ('С доставкой', 'Заберу сам');")
+    #     except asyncpg.exceptions.DuplicateObjectError as err:
+    #         logging.error(err)
+    #     try:
+    #         await self.pool.execute(
+    #             "CREATE TYPE or_status AS ENUM ('Ожидание пользователя', 'Ожидание подтверждения продавца', "
+    #             "'Подтвержден, готовится', 'Отклонен', 'Отменен пользователем', 'Заказ готов', "
+    #             "'Заказ доставлен/выдан');")
+    #     except asyncpg.exceptions.DuplicateObjectError as err:
+    #         logging.error(err)
+    #     await self.pool.execute(sql)
+
     async def create_table_orders(self):
         """Создаем таблицу заказов"""
         sql = """
-           CREATE TABLE IF NOT EXISTS orders (
-           order_id SERIAL PRIMARY KEY,
-           order_user_telegram_id INT NOT NULL,
-           order_metro_id INT NOT NULL,
-           order_location_id INT NOT NULL,
-           order_local_object_id INT NOT NULL,
-           order_local_object_name VARCHAR(255) NOT NULL,
-           order_created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-           time_for_delivery INT,
-           deliver_to TIME,
-           delivery_method deliv_method,
-           order_pass_for_courier VARCHAR(500),
-           order_courier_name VARCHAR(255),
-           order_courier_telegram_id INT,
-           delivery_address TEXT,
-           order_info TEXT,
-           order_price INT,
-           order_status or_status,
-           reason_for_rejection TEXT
-           );
-           """
+            CREATE TABLE IF NOT EXISTS orders (
+            order_id SERIAL PRIMARY KEY,
+            order_user_id INT NOT NULL,
+            order_seller_id INT,
+            order_courier_id INT,
+            order_date DATE,
+            order_created_at TIME,
+            order_accepted_at TIME,
+            order_canceled_at TIME,
+            order_time_for_delivery TIME,
+            order_delivered_at TIME,
+            order_deliver_through INT,
+            order_local_object_id INT,
+            order_address TEXT,
+            order_pass_to_courier TEXT,
+            order_final_price INT,
+            order_delivery_method order_method,
+            order_status order_status,
+            order_review TEXT,
+            order_reason_for_rejection TEXT
+            );
+            """
         try:
-            await self.pool.execute("CREATE TYPE deliv_method AS ENUM ('С доставкой', 'Заберу сам');")
+            await self.pool.execute("CREATE TYPE order_method AS ENUM ('Доставка', 'Самовывоз');")
         except asyncpg.exceptions.DuplicateObjectError as err:
             logging.error(err)
         try:
             await self.pool.execute(
-                "CREATE TYPE or_status AS ENUM ('Ожидание пользователя', 'Ожидание подтверждения продавца', "
-                "'Подтвержден, готовится', 'Отклонен', 'Отменен пользователем', 'Заказ готов', "
-                "'Заказ доставлен/выдан');")
+                "CREATE TYPE order_status AS ENUM ('Ожидание пользователя', 'Ожидание продавца',"
+                "'Принят', 'Приготовлен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером', "
+                "'Выполнен');")
         except asyncpg.exceptions.DuplicateObjectError as err:
             logging.error(err)
+        await self.pool.execute(sql)
+
+    async def create_table_order_products(self):
+        """Создаем таблицу заказов"""
+        sql = """
+           CREATE TABLE IF NOT EXISTS order_products (
+           op_order_id INT,
+           op_product_id INT,
+           op_size_id INT,
+           op_product_name VARCHAR(255),
+           op_quantity INT,
+           op_price_per_unit INT,
+           op_price INT,
+           FOREIGN KEY (op_order_id) REFERENCES orders (order_id) ON DELETE CASCADE ON UPDATE CASCADE
+           );
+           """
         await self.pool.execute(sql)
 
     async def create_table_delivery_orders(self):
@@ -629,85 +683,117 @@ AND is_local_object_available = true ORDER BY metro_id""")
                                 )
 
     async def add_order(self,
-                        order_user_telegram_id,
-                        order_metro_id,
-                        order_location_id,
+                        order_user_id,
                         order_local_object_id,
-                        order_local_object_name,
-                        delivery_method,
-                        order_info,
-                        order_price,
+                        order_final_price,
+                        order_delivery_method,
                         order_status):
         """Добавляем новый заказ в таблицу"""
         sql = """
-        INSERT INTO orders (order_user_telegram_id, order_metro_id, order_location_id, order_local_object_id,
-         order_local_object_name, delivery_method, order_info, order_price, order_status) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"""
+        INSERT INTO orders (order_user_id, order_local_object_id, order_final_price,
+         order_delivery_method, order_status) 
+        VALUES ($1, $2, $3, $4, $5)"""
         done = False
         count = 0
         while not done:
             if count == 15:
                 break
             try:
-                await self.pool.execute(sql, order_user_telegram_id, order_metro_id, order_location_id,
-                                        order_local_object_id,
-                                        order_local_object_name, delivery_method, order_info, order_price, order_status)
+                await self.pool.execute(sql, order_user_id, order_local_object_id,
+                                        order_final_price, order_delivery_method, order_status)
                 done = True
             except asyncpg.exceptions.UniqueViolationError as err:
                 if count == 14:
                     logging.error(err)
                 count += 1
 
+    # async def add_order_pickup(self,
+    #                            order_user_telegram_id,
+    #                            order_metro_id,
+    #                            order_location_id,
+    #                            order_local_object_id,
+    #                            order_local_object_name,
+    #                            delivery_method,
+    #                            delivery_address,
+    #                            order_info,
+    #                            order_price,
+    #                            order_status):
+    #     """Добавляем новый заказ в таблицу"""
+    #     sql = """
+    #     INSERT INTO orders (order_user_telegram_id, order_metro_id, order_location_id, order_local_object_id,
+    #      order_local_object_name, delivery_method, delivery_address, order_info, order_price, order_status)
+    #     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"""
+    #     done = False
+    #     count = 0
+    #     while not done:
+    #         if count == 15:
+    #             break
+    #         try:
+    #             await self.pool.execute(sql, order_user_telegram_id, order_metro_id, order_location_id,
+    #                                     order_local_object_id, order_local_object_name, delivery_method,
+    #                                     delivery_address, order_info, order_price, order_status)
+    #             done = True
+    #         except asyncpg.exceptions.UniqueViolationError as err:
+    #             if count == 14:
+    #                 logging.error(err)
+    #             count += 1
+
     async def add_order_pickup(self,
-                               order_user_telegram_id,
-                               order_metro_id,
-                               order_location_id,
+                               order_user_id,
                                order_local_object_id,
-                               order_local_object_name,
-                               delivery_method,
-                               delivery_address,
-                               order_info,
-                               order_price,
+                               order_address,
+                               order_final_price,
+                               order_delivery_method,
                                order_status):
         """Добавляем новый заказ в таблицу"""
         sql = """
-        INSERT INTO orders (order_user_telegram_id, order_metro_id, order_location_id, order_local_object_id,
-         order_local_object_name, delivery_method, delivery_address, order_info, order_price, order_status) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"""
+        INSERT INTO orders (order_user_id, order_local_object_id, order_address,
+         order_final_price, order_delivery_method, order_status) 
+        VALUES ($1, $2, $3, $4, $5, $6)"""
         done = False
         count = 0
         while not done:
             if count == 15:
                 break
             try:
-                await self.pool.execute(sql, order_user_telegram_id, order_metro_id, order_location_id,
-                                        order_local_object_id, order_local_object_name, delivery_method,
-                                        delivery_address, order_info, order_price, order_status)
+                await self.pool.execute(sql, order_user_id, order_local_object_id,
+                                        order_address, order_final_price, order_delivery_method,
+                                        order_status)
                 done = True
             except asyncpg.exceptions.UniqueViolationError as err:
                 if count == 14:
                     logging.error(err)
                 count += 1
+
+    # async def get_user_address_data(self, user_id):
+    #     """Получаем инфу о пользователе для создания заказа"""
+    #     return await self.pool.fetchrow(
+    #         f"""SELECT user_metro_id, user_location_id, user_local_object_id, user_address, location_address,
+    #             local_object_name
+    #             FROM users
+    #             JOIN locations ON user_location_id=location_id
+    #             JOIN local_objects ON local_object_id=user_local_object_id
+    #             WHERE user_telegram_id = {user_id};"""
+    #     )
 
     async def get_user_address_data(self, user_id):
         """Получаем инфу о пользователе для создания заказа"""
         return await self.pool.fetchrow(
-            f"""SELECT user_metro_id, user_location_id, user_local_object_id, user_address, location_address, 
-                local_object_name
+            f"""SELECT user_id, user_local_object_id, user_address, location_address, local_object_name
                 FROM users 
                 JOIN locations ON user_location_id=location_id
                 JOIN local_objects ON local_object_id=user_local_object_id
                 WHERE user_telegram_id = {user_id};"""
         )
 
-    async def get_user_address_data_without_location_address(self, user_id):
-        """Получаем инфу о пользователе для создания заказа"""
-        return await self.pool.fetchrow(
-            f"""SELECT user_metro_id, user_location_id, user_local_object_id, user_address, local_object_name
-                FROM users 
-                JOIN local_objects ON local_object_id=user_local_object_id
-                WHERE user_telegram_id = {user_id};"""
-        )
+    # async def get_user_address_data_without_location_address(self, user_id):
+    #     """Получаем инфу о пользователе для создания заказа"""
+    #     return await self.pool.fetchrow(
+    #         f"""SELECT user_metro_id, user_location_id, user_local_object_id, user_address, local_object_name
+    #             FROM users
+    #             JOIN local_objects ON local_object_id=user_local_object_id
+    #             WHERE user_telegram_id = {user_id};"""
+    #     )
 
     async def get_user_adress_info(self, user_id):
         """Получаем инфу о пользователе для создания заказа"""
@@ -719,16 +805,80 @@ AND is_local_object_available = true ORDER BY metro_id""")
     async def get_last_order_id(self, user_id):
         """Получаем id последнего заказа пользователя"""
         return await self.pool.fetchval(
-            f'SELECT order_id FROM orders WHERE order_user_telegram_id = {user_id} ORDER BY -order_id'
+            f'SELECT order_id FROM orders '
+            f'WHERE order_user_id = (select user_id from users where user_telegram_id = {user_id}) '
+            f'ORDER BY -order_id'
         )
 
-    async def get_last_user_order_detail(self, user_id):
-        """Получаем id последнего заказа пользователя"""
+    async def get_last_order_data(self, user_id):
+        """Получаем данные текущего заказа"""
         return await self.pool.fetchrow(
-            f"""SELECT order_id, order_local_object_name, order_location_id, deliver_to, delivery_address, order_info, 
-                order_price, order_status, order_pass_for_courier, delivery_method
-                FROM orders WHERE order_user_telegram_id = {user_id} ORDER BY -order_id"""
+            f"""SELECT order_id, local_object_name, location_id, order_final_price, order_address
+FROM orders 
+JOIN local_objects on local_object_id=order_local_object_id
+JOIN locations on local_object_location_id=location_id
+WHERE order_user_id = (select user_id from users where user_telegram_id = {user_id})
+ORDER BY -order_id"""
         )
+
+    async def get_last_order_big_data(self, user_id):
+        """Получаем данные текущего заказа"""
+        return await self.pool.fetchrow(
+            f"""SELECT order_id, local_object_name, location_id, order_final_price, order_address, 
+order_delivery_method, order_pass_to_courier, order_deliver_through, order_status
+    FROM orders 
+    JOIN local_objects on local_object_id=order_local_object_id
+    JOIN locations on local_object_location_id=location_id
+    WHERE order_user_id = (select user_id from users where user_telegram_id = {user_id})
+    ORDER BY -order_id"""
+        )
+
+    async def get_order_data(self, order_id):
+        """Получаем данные текущего заказа"""
+        return await self.pool.fetchrow(
+            f"""SELECT local_object_name, order_final_price, order_address, order_time_for_delivery, user_telegram_id
+        FROM orders 
+        JOIN local_objects on local_object_id=order_local_object_id
+        JOIN users on order_user_id=user_id
+        WHERE order_id = {order_id}
+        ORDER BY -order_id"""
+        )
+
+    async def get_active_order_data(self, order_id):
+        """Получаем данные текущего заказа"""
+        return await self.pool.fetchrow(
+            f"""SELECT local_object_name, order_final_price, order_address, order_time_for_delivery, courier_telegram_id
+        FROM orders 
+        JOIN local_objects on local_object_id=order_local_object_id
+        JOIN couriers on order_courier_id=courier_id
+        WHERE order_id = {order_id}
+        ORDER BY -order_id"""
+        )
+
+    async def get_active_order_little_data(self, order_id):
+        """получаем данные заказа"""
+        return await self.pool.fetchrow(
+            f"""select order_address, order_final_price from orders where order_id={order_id}"""
+        )
+
+    async def get_last_order_location(self, user_id):
+        """Получаем id локации и заказа"""
+        return await self.pool.fetchrow(
+            f"""SELECT order_id, location_id
+            FROM orders 
+            JOIN local_objects on local_object_id=order_local_object_id
+            JOIN locations on local_object_location_id=location_id
+            WHERE order_user_id = (select user_id from users where user_telegram_id = {user_id})
+            ORDER BY -order_id"""
+        )
+
+    # async def get_last_user_order_detail(self, user_id):
+    #     """Получаем id последнего заказа пользователя"""
+    #     return await self.pool.fetchrow(
+    #         f"""SELECT order_id, order_local_object_name, order_location_id, deliver_to, delivery_address, order_info,
+    #             order_price, order_status, order_pass_for_courier, delivery_method
+    #             FROM orders WHERE order_user_telegram_id = {user_id} ORDER BY -order_id"""
+    #     )
 
     async def get_couriers_list(self, location_id):
         """Получаем список курьеров, закрепленных за локацией"""
@@ -739,7 +889,7 @@ AND is_local_object_available = true ORDER BY metro_id""")
     async def update_order_address(self, order_id, address):
         """Обновляем адрес доставки"""
         await self.pool.execute(
-            f"""UPDATE orders SET delivery_address = '{address}' WHERE order_id = {order_id}"""
+            f"""UPDATE orders SET order_address = '{address}' WHERE order_id = {order_id}"""
         )
 
     async def update_user_address(self, user_id, address):
@@ -751,13 +901,16 @@ AND is_local_object_available = true ORDER BY metro_id""")
     async def update_order_pass(self, order_id, pass_value):
         """Обновляем адрес доставки"""
         await self.pool.execute(
-            f"""UPDATE orders SET order_pass_for_courier = '{pass_value}' WHERE order_id = {order_id}"""
+            f"""UPDATE orders SET order_pass_to_courier = '{pass_value}' WHERE order_id = {order_id}"""
         )
 
-    async def update_deliver_to(self, order_id, time_value):
+    async def update_deliver_to(self, order_id, time_value, now_time):
         """Обновляем адрес доставки"""
         await self.pool.execute(
-            f"""UPDATE orders SET deliver_to = '{time_value}' WHERE order_id = {order_id}"""
+            f"""UPDATE orders 
+SET order_time_for_delivery = '{time_value}',
+order_accepted_at = '{now_time}'
+WHERE order_id = {order_id}"""
         )
 
     async def get_last_user_order_detail_after_confirm(self, user_id):
@@ -785,10 +938,14 @@ AND is_local_object_available = true ORDER BY metro_id""")
             f'UPDATE orders SET order_created_at = now() WHERE order_id = {order_id}'
         )
 
-    async def update_order_status_and_created_at(self, order_id, status):
+    async def update_order_status_and_date(self, order_id, date, time, status):
         """Обновляем статус и время создания заказа"""
         await self.pool.execute(
-            f"""UPDATE orders SET order_status = '{status}', order_created_at = now() WHERE order_id = {order_id}"""
+            f"""UPDATE orders 
+SET order_status = '{status}', 
+order_date = '{date}',
+order_created_at = '{time}'
+WHERE order_id = {order_id}"""
         )
 
     async def get_size_info(self, size_id):
@@ -859,25 +1016,31 @@ AND is_local_object_available = true ORDER BY metro_id""")
     async def clear_empty_orders(self, user_id):
         """Очищаем корзину пользователя"""
         await self.pool.execute(
-            f"DELETE from orders * WHERE order_user_telegram_id = {user_id} AND order_status = 'Ожидание пользователя'"
+            f"DELETE from orders * WHERE order_user_id =(select user_id from users where user_telegram_id = {user_id}) "
+            f"AND order_status = 'Ожидание пользователя'"
         )
 
-    async def update_time_for_delivery(self, order_id, time_value):
+    async def update_order_deliver_through(self, order_id, time_value):
         """Обновляем время, для доставки"""
         await self.pool.execute(
-            f"""UPDATE orders SET time_for_delivery = {time_value} WHERE order_id = {order_id}"""
+            f"""UPDATE orders SET order_deliver_through = {time_value} WHERE order_id = {order_id}"""
         )
 
     async def get_order_pass_value(self, order_id):
         """Получаем статус способо доставки"""
         return await self.pool.fetchval(
-            f"SELECT order_pass_for_courier FROM orders WHERE order_id = {order_id}"
+            f"SELECT order_pass_to_courier FROM orders WHERE order_id = {order_id}"
         )
 
     async def get_time_and_user_id(self, order_id):
         """Получаем время, за которое необходимо приготовить/доставить заказ"""
         return await self.pool.fetchrow(
-            f'SELECT time_for_delivery, order_user_telegram_id, order_location_id FROM orders WHERE order_id = {order_id}'
+            f"""SELECT order_deliver_through, user_telegram_id, location_id
+FROM orders 
+JOIN users on order_user_id=user_id
+JOIN local_objects on order_local_object_id=local_object_id
+JOIN locations ON local_object_location_id=location_id
+WHERE order_id = {order_id}"""
         )
 
     async def get_order_status(self, order_id):
@@ -889,7 +1052,8 @@ AND is_local_object_available = true ORDER BY metro_id""")
     async def get_user_tg_id(self, order_id):
         """Получаем id клиента"""
         return await self.pool.fetchval(
-            f'SELECT order_user_telegram_id FROM orders WHERE order_id = {order_id}'
+            f'SELECT user_telegram_id FROM users '
+            f'WHERE user_id = (select order_user_id from orders where order_id={order_id})'
         )
 
     async def update_order_status(self, order_id, order_status):
@@ -898,19 +1062,79 @@ AND is_local_object_available = true ORDER BY metro_id""")
             f"""UPDATE orders SET order_status = '{order_status}' WHERE order_id = {order_id}"""
         )
 
+    async def update_order_delivered_at(self, order_id):
+        """Обновляем статус заказа"""
+        await self.pool.execute(
+            f"""UPDATE orders 
+        SET order_delivered_at = now() 
+        WHERE order_id = {order_id}"""
+        )
+
+    async def reset_order_time_and_seller(self, order_id):
+        """Сброс продавца и времени"""
+        await self.pool.execute(
+            f"""UPDATE orders 
+SET order_seller_id = null,
+order_time_for_delivery = null,
+order_courier_id = null,
+order_accepted_at = null
+WHERE order_id = {order_id}"""
+        )
+
     async def update_reason_for_rejection(self, order_id, reason):
         """Обновляем статус заказа"""
         await self.pool.execute(
-            f"""UPDATE orders SET reason_for_rejection = '{reason}' WHERE order_id = {order_id}"""
+            f"""UPDATE orders SET 
+order_reason_for_rejection = '{reason}',
+order_status = 'Отклонен продавцом',
+order_canceled_at = now()
+WHERE order_id = {order_id}"""
         )
 
-    async def take_order(self, order_id):
+    async def update_reason_for_rejection_courier(self, order_id, reason):
         """Обновляем статус заказа"""
-        if await self.pool.fetchval(
-                f"SELECT order_status FROM orders WHERE order_id = {order_id}") == "Ожидание подтверждения продавца":
+        await self.pool.execute(
+            f"""UPDATE orders SET 
+    order_reason_for_rejection = '{reason}',
+    order_status = 'Отменен курьером',
+    order_canceled_at = now()
+    WHERE order_id = {order_id}"""
+        )
+
+    async def update_reason_for_rejection_user(self, order_id, reason):
+        """Обновляем статус заказа"""
+        await self.pool.execute(
+            f"""UPDATE orders SET 
+    order_reason_for_rejection = '{reason}',
+    order_status = 'Отменен пользователем',
+    order_canceled_at = now()
+    WHERE order_id = {order_id}"""
+        )
+
+    async def update_review(self, order_id, review):
+        """Обновляем статус заказа"""
+        await self.pool.execute(
+            f"""UPDATE orders SET 
+    order_review = '{review}'
+    WHERE order_id = {order_id}"""
+        )
+
+    async def take_order(self, order_id, user_id):
+        """Обновляем статус заказа"""
+        if await self.pool.fetchval(f"SELECT order_seller_id FROM orders WHERE order_id ={order_id}"):
+            return False
+        elif await self.pool.fetchval(
+                f"SELECT order_status FROM orders WHERE order_id ={order_id}") == 'Ожидание продавца':
             await self.pool.execute(
-                f"""UPDATE orders SET order_status = 'Подтвержден, готовится' WHERE order_id = {order_id}"""
+                f"""UPDATE orders 
+SET order_seller_id = (SELECT seller_id FROM sellers WHERE seller_telegram_id = {user_id}) 
+WHERE order_id = {order_id}"""
             )
+            return True
+
+    async def order_is_not_canceled(self, order_id):
+        """Проверяем не отменен ли заказ"""
+        if await self.pool.fetchval(f"SELECT order_status FROM orders WHERE order_id ={order_id}") == 'Приготовлен':
             return True
         else:
             return False
@@ -918,7 +1142,8 @@ AND is_local_object_available = true ORDER BY metro_id""")
     async def get_couriers_for_location(self, location_id):
         """Получаем список курьеров, закрепленных за локацией"""
         return await self.pool.fetch(
-            f'SELECT courier_name, courier_telegram_id FROM couriers WHERE courier_location_id = {location_id} AND courier_status = true'
+            f'SELECT courier_name, courier_telegram_id FROM couriers '
+            f'WHERE courier_location_id = {location_id} AND courier_status = true'
         )
 
     async def get_courier_name(self, courier_tg_id):
@@ -927,10 +1152,11 @@ AND is_local_object_available = true ORDER BY metro_id""")
             f'SELECT courier_name FROM couriers WHERE courier_telegram_id = {courier_tg_id}'
         )
 
-    async def update_order_courier(self, order_id, courier_name, courier_tg_id):
+    async def update_order_courier(self, order_id, courier_tg_id):
         """Обновляем статус заказа"""
         await self.pool.execute(
-            f"""UPDATE orders SET order_courier_name = '{courier_name}', order_courier_telegram_id = {courier_tg_id}
+            f"""UPDATE orders 
+SET order_courier_id = (select courier_id from couriers where courier_telegram_id={courier_tg_id})
 WHERE order_id = {order_id}"""
         )
 
@@ -948,15 +1174,48 @@ WHERE order_id = {order_id}"""
             f'SELECT seller_location_id FROM sellers WHERE seller_telegram_id = {seller_id}'
         )
 
-    async def get_active_orders_by_location_id(self, location_id):
-        """Получаем заказы для локации"""
+    async def get_active_orders_by_seller(self, seller_id):
+        """Получаем заказы"""
         return await self.pool.fetch(
             f"""
-            SELECT order_id, deliver_to, delivery_method, order_info, order_user_telegram_id
+            SELECT order_id, order_delivery_method, order_time_for_delivery, order_courier_id, order_final_price,
+user_telegram_id
             FROM orders 
-            WHERE order_location_id = {location_id} AND order_status = 'Подтвержден, готовится' order by deliver_to
+			JOIN users on user_id=order_user_id
+            WHERE order_seller_id = (select seller_id from sellers where seller_telegram_id={seller_id})
+            AND order_status = 'Принят'
+            order by order_id;
             """
         )
+
+    async def get_delivery_orders_by_seller(self, seller_id):
+        """Получаем заказы"""
+        return await self.pool.fetch(
+            f"""
+            SELECT order_id, order_time_for_delivery, order_final_price, user_telegram_id, order_status
+            FROM orders 
+    		Join users on user_id=order_user_id
+            WHERE order_seller_id = (select seller_id from sellers where seller_telegram_id={seller_id})
+            AND order_status = 'Приготовлен'
+            AND order_delivery_method = 'Самовывоз'
+            order by order_id;
+                """
+        )
+
+    async def get_courier_name_by_id(self, courier_id):
+        """Получаем имя курьера"""
+        return await self.pool.fetchval(f"""
+select courier_name from couriers where courier_id={courier_id}""")
+
+    async def get_courier_tg_id(self, courier_id):
+        """Получаем имя курьера"""
+        return await self.pool.fetchval(f"""
+    select courier_telegram_id from couriers where courier_id={courier_id}""")
+
+    async def get_seller_tg_id(self, seller_id):
+        """Получаем имя курьера"""
+        return await self.pool.fetchval(f"""
+    select seller_telegram_id from sellers where seller_id={seller_id}""")
 
     async def get_active_bonus_orders_by_location_id(self, location_id):
         """Получаем заказы для локации"""
@@ -982,10 +1241,15 @@ WHERE order_id = {order_id}"""
         """Получаем заказы для локации"""
         return await self.pool.fetch(
             f"""
-            SELECT *
+            SELECT order_id, order_delivery_method, local_object_name, order_address, order_created_at, 
+order_date, order_deliver_through, order_pass_to_courier, order_final_price, order_status
             FROM orders 
-            WHERE order_location_id = {location_id} AND order_status = 'Ожидание подтверждения продавца' 
-            order by order_created_at
+            JOIN local_objects on local_object_id = order_local_object_id
+            JOIN locations on local_object_location_id = location_id
+            WHERE location_id = {location_id}
+            AND order_seller_id is null
+            AND order_status = 'Ожидание продавца'
+            order by order_id
             """
         )
 
@@ -1015,11 +1279,14 @@ WHERE order_id = {order_id}"""
         """Получаем все заказы для курьера"""
         return await self.pool.fetch(
             f"""
-            SELECT order_id, deliver_to, order_info, order_local_object_name, 
-            delivery_address, order_price, order_user_telegram_id
+            SELECT order_id, order_time_for_delivery, local_object_name, order_address, order_status, 
+order_final_price, user_telegram_id
             FROM orders 
-            WHERE order_courier_telegram_id = {courier_tg_id} AND order_status = 'Заказ готов'
-            order by deliver_to
+            JOIN users on user_id=order_user_id
+    		JOIN local_objects on local_object_id=order_local_object_id
+            WHERE order_courier_id = (select courier_id from couriers where courier_telegram_id = {courier_tg_id}) 
+    		AND order_status = 'Приготовлен'
+            order by order_time_for_delivery
             """
         )
 
@@ -1027,11 +1294,12 @@ WHERE order_id = {order_id}"""
         """Получаем все заказы для курьера"""
         return await self.pool.fetch(
             f"""
-            SELECT order_id, deliver_to, order_info, order_local_object_name, order_status,
-            delivery_address, order_price
+            SELECT order_id, order_time_for_delivery, local_object_name, order_address, order_status, order_final_price
             FROM orders 
-            WHERE order_courier_telegram_id = {courier_tg_id} AND order_status = 'Подтвержден, готовится'
-            order by deliver_to
+			JOIN local_objects on local_object_id=order_local_object_id
+            WHERE order_courier_id = (select courier_id from couriers where courier_telegram_id = {courier_tg_id}) 
+			AND order_status = 'Принят'
+            order by order_time_for_delivery
             """
         )
 
@@ -1046,50 +1314,43 @@ WHERE order_id = {order_id}"""
             """
         )
 
-    async def order_is_delivered(self, order_id, user_id):
+    async def order_is_delivered(self, user_id):
         """Подтверждаем доставку/выдачу заказа"""
-        if await self.pool.fetchval(
-                f'SELECT order_status FROM orders WHERE order_id = {order_id}'
-        ) == 'Заказ готов':
+        num_user_and_inviter_id = await self.pool.fetchrow(
+            f"SELECT number_of_orders, inviter_id  FROM users WHERE user_telegram_id = {user_id}"
+        )
+        num_orders = num_user_and_inviter_id['number_of_orders']
+        try:
+            inviter_id = int(num_user_and_inviter_id['inviter_id'])
+        except Exception as err:
+            logging.error(err)
+            inviter_id = None
+        if inviter_id:
+            num_orders_and_bonus = await self.pool.fetchrow(
+                f"SELECT number_of_referral_orders, bonus  FROM users "
+                f"WHERE user_telegram_id = {inviter_id}"
+            )
+            num_ref_orders = num_orders_and_bonus['number_of_referral_orders']
+            bonus = num_orders_and_bonus['bonus']
+            if num_orders == 0:
+                bonus += 1
+            num_orders += 1
+            num_ref_orders += 1
+            if num_ref_orders % 10 == 0:
+                bonus += 1
+
             await self.pool.execute(
-                f"UPDATE orders SET order_status = 'Заказ доставлен/выдан' WHERE order_id = {order_id}"
+                f'UPDATE users SET number_of_orders = {num_orders} WHERE user_telegram_id = {user_id}'
             )
-            num_user_and_inviter_id = await self.pool.fetchrow(
-                f"SELECT number_of_orders, inviter_id  FROM users WHERE user_telegram_id = {user_id}"
+            await self.pool.execute(
+                f'UPDATE users SET number_of_referral_orders = {num_ref_orders}, bonus = {bonus}'
+                f' WHERE user_telegram_id = {inviter_id}'
             )
-            num_orders = num_user_and_inviter_id['number_of_orders']
-            try:
-                inviter_id = int(num_user_and_inviter_id['inviter_id'])
-            except Exception as err:
-                logging.error(err)
-                inviter_id = None
-            if inviter_id:
-                num_orders_and_bonus = await self.pool.fetchrow(
-                    f"SELECT number_of_referral_orders, bonus  FROM users "
-                    f"WHERE user_telegram_id = {inviter_id}"
-                )
-                num_ref_orders = num_orders_and_bonus['number_of_referral_orders']
-                bonus = num_orders_and_bonus['bonus']
-                if num_orders == 0:
-                    bonus += 1
-                num_orders += 1
-                num_ref_orders += 1
-                if num_ref_orders % 10 == 0:
-                    bonus += 1
-                await self.pool.execute(
-                    f'UPDATE users SET number_of_orders = {num_orders} WHERE user_telegram_id = {user_id}'
-                )
-                await self.pool.execute(
-                    f'UPDATE users SET number_of_referral_orders = {num_ref_orders}, bonus = {bonus}'
-                    f' WHERE user_telegram_id = {inviter_id}'
-                )
-            else:
-                num_orders += 1
-                await self.pool.execute(
-                    f'UPDATE users SET number_of_orders = {num_orders} WHERE user_telegram_id = {user_id}'
-                )
-            return True
-        return False
+        else:
+            num_orders += 1
+            await self.pool.execute(
+                f'UPDATE users SET number_of_orders = {num_orders} WHERE user_telegram_id = {user_id}'
+            )
 
     async def get_user(self, user_id):
         """Пытаемся получить пользователя из таблицы"""
@@ -1852,7 +2113,7 @@ ORDER BY product_id"""
             f"""SELECT delivery_product_id, delivery_product_name FROM delivery_products 
 WHERE delivery_product_category_id={category_id}
     ORDER BY delivery_product_id"""
-            )
+        )
 
     async def get_count_products(self, category_id):
         """Получаем количество товаров в категории"""
@@ -2149,7 +2410,7 @@ WHERE is_product_available = false ORDER BY category_id"""
     FROM delivery_categories
     JOIN delivery_products ON delivery_product_category_id=delivery_category_id
     WHERE is_de_product_available = false ORDER BY delivery_category_id"""
-            )
+        )
 
     async def get_category_for_remove_item_from_stock(self):
         """Выбираем все категории, в которых есть товары в продаже"""
@@ -2181,7 +2442,7 @@ WHERE product_category_id = {category_id} AND is_product_available = true ORDER 
         return await self.pool.fetch(
             f"""SELECT delivery_product_id, delivery_product_name FROM delivery_products
     WHERE delivery_product_category_id = {category_id} AND is_de_product_available = true ORDER BY delivery_product_id"""
-            )
+        )
 
     async def get_products_for_return_to_stock(self, category_id):
         """Выбираем товары из категории"""
@@ -2393,12 +2654,14 @@ ORDER BY product_category_id;"""
     async def get_orders_for_user(self, user_id):
         """Получаем активные ордеры"""
         return await self.pool.fetch(
-            f"""SELECT order_id, deliver_to, delivery_method, order_info, order_price, order_status
-FROM orders WHERE order_user_telegram_id={user_id}
+            f"""SELECT order_id, order_time_for_delivery, order_delivery_method, 
+order_final_price, order_status
+FROM orders WHERE order_user_id=(select user_id from users where user_telegram_id={user_id})
 AND order_status != 'Ожидание пользователя'
-AND order_status != 'Заказ доставлен/выдан'
-AND order_status != 'Отклонен'
+AND order_status != 'Отклонен продавцом'
 AND order_status != 'Отменен пользователем'
+AND order_status != 'Отменен курьером'
+AND order_status != 'Выполнен'
 ORDER BY order_id"""
         )
 
@@ -2503,7 +2766,7 @@ order by delivery_category_id;"""
     FROM delivery_categories
     JOIN delivery_products ON delivery_product_category_id = delivery_category_id
     order by delivery_category_id;"""
-            )
+        )
 
     async def get_delivery_products(self, category_id):
         """Получаем товары из категории"""
@@ -2708,3 +2971,51 @@ WHERE delivery_order_id = {order_id}""")
         await self.pool.execute(f"""UPDATE delivery_products 
 SET delivery_price = '{price}'
     WHERE delivery_product_id = {item_id}""")
+
+    async def add_order_product(self, op_order_id, order_detail):
+        """Добавляем выбранные товары к заказу"""
+        sql = """
+                INSERT INTO order_products (op_order_id, op_product_id, op_size_id, op_product_name, op_quantity,
+                 op_price_per_unit, op_price) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, op_order_id, order_detail['product_id'], order_detail['size_id'],
+                                        order_detail['product_name'], order_detail['quantity'],
+                                        order_detail['product_price'], order_detail['order_price'])
+                done = True
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
+                count += 1
+
+    async def get_order_products(self, order_id):
+        """Получаем товары из заказа"""
+        return await self.pool.fetch(f"""
+SELECT * FROM order_products WHERE op_order_id={order_id}""")
+
+    async def get_seller_admin_tg_id(self, order_id):
+        """Получаем id админа локации"""
+        return await self.pool.fetchval(f"""
+select admin_seller_telegram_id 
+from admin_sellers
+where admin_seller_location_id = (select local_object_location_id from local_objects
+where local_object_id = (select order_local_object_id from orders where order_id={order_id}))""")
+
+    async def get_seller_courier(self, order_id):
+        """Получаем id родавца и курьера"""
+        return await self.pool.fetchrow(f"""select order_seller_id, order_courier_id
+            from orders
+            where order_id={order_id}""")
+
+    async def order_has_review(self, order_id):
+        """Проверяем есть ли уже отзыв к заказу"""
+        rev = await self.pool.fetchval(f"select order_review from orders where order_id ={order_id}")
+        if rev:
+            return True
+        return False
