@@ -1,14 +1,16 @@
+from datetime import datetime
 import logging
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from pytz import timezone
 
 from keyboards.inline.callback_datas import bonuses_data, cancel_bonus_order_data
 from keyboards.inline.inline_keyboards import back_cancel_bonus_markup
 from loader import dp, db, bot
 from states.bonus_state import Bonus
-from utils.emoji import attention_em, error_em
+from utils.emoji import attention_em, error_em, success_em
 from utils.send_messages import send_message_to_sellers_bonus
 
 
@@ -71,6 +73,7 @@ async def show_qr_ref_code(call: CallbackQuery):
 
 @dp.callback_query_handler(bonuses_data.filter())
 async def get_bonus_order(call: CallbackQuery, callback_data: dict, state: FSMContext):
+    """Просим написать количество"""
     count_bonus = int(callback_data.get('count_bonus'))
     await state.update_data(count_bonus=count_bonus)
     await call.message.answer('Напишите количество.\n'
@@ -81,6 +84,7 @@ async def get_bonus_order(call: CallbackQuery, callback_data: dict, state: FSMCo
 
 @dp.message_handler(state=Bonus.Count)
 async def get_count_bonus(message: types.Message, state: FSMContext):
+    """Получаем количество"""
     data = await state.get_data()
     count_bonus = data.get('count_bonus')
     try:
@@ -97,17 +101,19 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
             await Bonus.Count.set()
         else:
             bonus_location_id = await db.get_user_location_id(message.from_user.id)
-            await db.add_bonus_order(message.from_user.id,
-                                     bonus_location_id,
+            await db.add_bonus_order(bonus_location_id,
+                                     datetime.now(timezone("Europe/Moscow")),
+                                     await db.get_user_id(message.from_user.id),
+                                     datetime.now(timezone("Europe/Moscow")),
                                      quantity,
-                                     bonus_order_status='Ожидание продавца')
+                                     'Ожидание продавца')
             await db.change_bonus_minus(user_id=message.from_user.id,
                                         count_bonus=quantity)
             bonus_order_info = await db.get_bonus_order_info(message.from_user.id)
-            sellers_list = await db.get_sellers_id_for_location(bonus_order_info['bonus_location_id'])
+            sellers_list = await db.get_sellers_id_for_location(bonus_order_info['bonus_order_location_id'])
             if sellers_list:
                 await message.answer(f'Ваш заказ № {bonus_order_info["bonus_order_id"]}Б сформирован - '
-                                     f'{bonus_order_info["bonus_quantity"]} шт.\n'
+                                     f'{bonus_order_info["bonus_order_quantity"]} шт.\n'
                                      f'{attention_em} Пожалуйста, покажите это сообщение продавцу',
                                      reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                          [
@@ -124,7 +130,9 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
                 await message.answer('Нет доступных продавцов. Попробуйте позже.')
                 await db.change_bonus_plus(user_id=message.from_user.id,
                                            count_bonus=quantity)
-                await db.set_bonus_order_status(bonus_order_info["bonus_order_id"], "Отклонен")
+                await db.set_bonus_order_status(bonus_order_info["bonus_order_id"],
+                                                "Отклонен",
+                                                'Не нашел доступных продавцов')
                 await state.finish()
 
     except Exception as err:
@@ -145,9 +153,12 @@ async def cancel_bonus_order(call: CallbackQuery, callback_data: dict, state: FS
     if bonus_status == 'Ожидание продавца':
         await db.change_bonus_plus(user_id=call.from_user.id,
                                    count_bonus=quantity)
-        await db.set_bonus_order_status(b_order_id, "Отклонен")
+        await db.set_bonus_order_status(b_order_id,
+                                        "Отменен пользователем до принятия продавцом",
+                                        'Причина не указана')
+        await db.set_bonus_order_canceled_at(b_order_id)
         await state.finish()
-        await call.message.answer(f'Ваш заказ № {b_order_id}Б отменен.')
+        await call.message.answer(f'{success_em}Ваш заказ № {b_order_id}Б отменен.')
     else:
         await call.message.answer(f'{error_em} Ваш заказ уже подтвержден. Чтобы отменить его, пожалуйста, подойдите к '
                                   f'продавцу.')

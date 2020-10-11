@@ -47,3 +47,6 @@ class Menu(StatesGroup):
     WaitReasonUser = State()
 
     WaitReview = State()
+
+    BonusOrderStatus = State()
+    WaitBonusReview = State()

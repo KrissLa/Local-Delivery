@@ -8,3 +8,5 @@ class SelectCourier(StatesGroup):
 
     WaitReasonActive = State()
     WaitReasonCourier = State()
+
+    CancelBonus = State()

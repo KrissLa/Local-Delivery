@@ -7,7 +7,7 @@ from keyboards.inline.inline_keyboards import cancel_order_user_markup, \
     back_markup
 from loader import dp, db
 from states.menu_states import Menu
-from utils.emoji import warning_em
+from utils.emoji import warning_em, error_em
 from utils.temp_orders_list import get_temp_orders_list_message, get_final_price
 
 
@@ -17,11 +17,14 @@ async def cancel_order(call: CallbackQuery, state: FSMContext, callback_data: di
     """Отмена заказа"""
     await call.message.edit_reply_markup()
     order_id = int(callback_data.get('order_id'))
-    await state.update_data(canceled_order_id=order_id)
-    await call.message.answer('Вы действительно хотите отменить заказ?',
-                              reply_markup=cancel_order_user_markup)
-    if await state.get_state() == 'Menu:WaitReasonUser':
-        await Menu.OrderStatus.set()
+    if await db.can_cancel(order_id):
+        await state.update_data(canceled_order_id=order_id)
+        await call.message.answer('Вы действительно хотите отменить заказ?',
+                                  reply_markup=cancel_order_user_markup)
+        if await state.get_state() == 'Menu:WaitReasonUser':
+            await Menu.OrderStatus.set()
+    else:
+        await call.message.answer(f'{error_em} Извините, но на этой стадии заказ отменить нельзя')
 
 
 @dp.callback_query_handler(text='back', state=[Menu.OrderStatus,

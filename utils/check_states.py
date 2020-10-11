@@ -106,7 +106,11 @@ states_for_menu = [ProfileState.WaitAddress,
                    SelectCourier.WaitReasonCourier,
                    Menu.WaitReview,
                    SelectCourier.WaitReasonActive,
-                   SelectCourier.WaitReason]
+                   SelectCourier.WaitReason,
+                   Menu.WaitBonusReview,
+                   SellerAdmin.Month,
+                   SellerAdmin.Year,
+                   SellerAdmin.Day]
 
 
 async def reset_state(state, message):
@@ -148,14 +152,16 @@ async def reset_state(state, message):
                                    'AddAdmin:DeliveryItemPrice', 'SellerAdmin:ChangeOrder',
                                    'SellerAdmin:ChangeDeliveryDate',
                                    'SellerAdmin:WaitCancelConfirm', 'SellerAdmin:ChangeDeliveryTime',
-                                   'SellerAdmin:ChangeDeliveryConfirm', 'SellerAdmin:ChangeDeliveryWaitConfirm']:
+                                   'SellerAdmin:ChangeDeliveryConfirm', 'SellerAdmin:ChangeDeliveryWaitConfirm',
+                                   'SellerAdmin:Month', 'SellerAdmin:Year', 'SellerAdmin:Day'
+                                   ]:
         await state.finish()
     elif await state.get_state() in ['Menu:OrderStatus', 'Menu:WaitReasonUser', 'SelectCourier:WaitReasonCourier',
                                      'SelectCourier:WaitReason', 'SelectCourier:WaitReasonActive']:
         await state.finish()
         await message.answer('Заказ не отменен',
                              reply_markup=menu_keyboard)
-    elif await state.get_state() in ['Menu:WaitReview']:
+    elif await state.get_state() in ['Menu:WaitReview', 'Menu:WaitBonusReview']:
         await state.finish()
         await message.answer('Отзыв не сохранен',
                              reply_markup=menu_keyboard)

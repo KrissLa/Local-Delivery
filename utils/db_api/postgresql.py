@@ -301,6 +301,8 @@ class Database:
             order_seller_id INT,
             order_courier_id INT,
             order_date DATE,
+            order_year INT,
+            order_month INT,
             order_created_at TIME,
             order_accepted_at TIME,
             order_canceled_at TIME,
@@ -353,7 +355,7 @@ class Database:
            delivery_order_id SERIAL PRIMARY KEY,
            delivery_order_user_telegram_id INT NOT NULL,
            delivery_order_location_id INT NOT NULL,
-           delivery_order_created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+           delivery_order_created_at time DEFAULT now() NOT NULL,
            day_for_delivery date,
            de_time_for_delivery time,
            delivery_datetime TIMESTAMP,
@@ -408,15 +410,36 @@ class Database:
            """
         await self.pool.execute(sql)
 
+    # async def create_table_bonus_orders(self):
+    #     """Создаем таблицу бонусных заказов"""
+    #     sql = """
+    #                CREATE TABLE IF NOT EXISTS bonus_orders (
+    #                bonus_order_id SERIAL PRIMARY KEY,
+    #                bonus_order_user_telegram_id INT NOT NULL,
+    #                bonus_location_id INT NOT NULL,
+    #                bonus_quantity INT NOT NULL,
+    #                bonus_order_status VARCHAR(255)
+    #                );
+    #                """
+    #     await self.pool.execute(sql)
+
     async def create_table_bonus_orders(self):
         """Создаем таблицу бонусных заказов"""
         sql = """
                    CREATE TABLE IF NOT EXISTS bonus_orders (
                    bonus_order_id SERIAL PRIMARY KEY,
-                   bonus_order_user_telegram_id INT NOT NULL,
-                   bonus_location_id INT NOT NULL,
-                   bonus_quantity INT NOT NULL,
-                   bonus_order_status VARCHAR(255)
+                   bonus_order_location_id INT NOT NULL,
+                   bonus_order_date DATE,
+                   bonus_order_user_id INT NOT NULL,
+                   bonus_order_seller_id INT,
+                   bonus_order_created_at TIME,
+                   bonus_order_accepted_at TIME,
+                   bonus_order_canceled_at TIME,
+                   bonus_order_delivered_at TIME,
+                   bonus_order_quantity INT NOT NULL,
+                   bonus_order_status VARCHAR(255),
+                   bonus_order_review TEXT,
+                   bonus_order_reason_for_rejection TEXT
                    );
                    """
         await self.pool.execute(sql)
@@ -938,13 +961,15 @@ WHERE order_id = {order_id}"""
             f'UPDATE orders SET order_created_at = now() WHERE order_id = {order_id}'
         )
 
-    async def update_order_status_and_date(self, order_id, date, time, status):
+    async def update_order_status_and_date(self, order_id, date, time, status, year, month):
         """Обновляем статус и время создания заказа"""
         await self.pool.execute(
             f"""UPDATE orders 
 SET order_status = '{status}', 
 order_date = '{date}',
-order_created_at = '{time}'
+order_created_at = '{time}',
+order_year = {year},
+order_month = {month},
 WHERE order_id = {order_id}"""
         )
 
@@ -1049,6 +1074,15 @@ WHERE order_id = {order_id}"""
             f'SELECT order_status FROM orders WHERE order_id = {order_id}'
         )
 
+    async def can_cancel(self, order_id):
+        """Получаем статус заказа"""
+        status = await self.pool.fetchval(
+            f'SELECT order_status FROM orders WHERE order_id = {order_id}'
+        )
+        if status in ['Ожидание продавца', 'Принят', 'Приготовлен']:
+            return True
+        return False
+
     async def get_user_tg_id(self, order_id):
         """Получаем id клиента"""
         return await self.pool.fetchval(
@@ -1119,6 +1153,14 @@ WHERE order_id = {order_id}"""
     WHERE order_id = {order_id}"""
         )
 
+    async def update_bonus_review(self, order_id, review):
+        """Обновляем статус заказа"""
+        await self.pool.execute(
+            f"""UPDATE bonus_orders SET 
+    bonus_order_review = '{review}'
+    WHERE bonus_order_id = {order_id}"""
+        )
+
     async def take_order(self, order_id, user_id):
         """Обновляем статус заказа"""
         if await self.pool.fetchval(f"SELECT order_seller_id FROM orders WHERE order_id ={order_id}"):
@@ -1129,6 +1171,30 @@ WHERE order_id = {order_id}"""
                 f"""UPDATE orders 
 SET order_seller_id = (SELECT seller_id FROM sellers WHERE seller_telegram_id = {user_id}) 
 WHERE order_id = {order_id}"""
+            )
+            return True
+
+    async def take_bonus_order(self, order_id, new_seller_id):
+        """Проверка и принятие заказа"""
+        order_status = await self.pool.fetchval(
+            f"SELECT bonus_order_status FROM bonus_orders WHERE bonus_order_id ={order_id}")
+        bonus_seller_id = await self.pool.fetchval(
+            f"SELECT bonus_order_seller_id FROM bonus_orders WHERE bonus_order_id ={order_id}")
+        try:
+            seller_id = await self.pool.fetchval(
+                f"SELECT seller_id FROM sellers WHERE seller_telegram_id = {new_seller_id}")
+        except:
+            seller_id = None
+        if bonus_seller_id == seller_id and order_status == 'Подтвержден, готовится' \
+                or bonus_seller_id == seller_id and order_status == 'Готов':
+            return True
+        elif bonus_seller_id:
+            return False
+        elif order_status == 'Ожидание продавца':
+            await self.pool.execute(
+                f"""UPDATE bonus_orders 
+    SET bonus_order_seller_id = (SELECT seller_id FROM sellers WHERE seller_telegram_id = {new_seller_id}) 
+    WHERE bonus_order_id = {order_id}"""
             )
             return True
 
@@ -1217,23 +1283,29 @@ select courier_name from couriers where courier_id={courier_id}""")
         return await self.pool.fetchval(f"""
     select seller_telegram_id from sellers where seller_id={seller_id}""")
 
-    async def get_active_bonus_orders_by_location_id(self, location_id):
+    async def get_active_bonus_orders_by_seller_id(self, seller_id):
         """Получаем заказы для локации"""
         return await self.pool.fetch(
             f"""
-            SELECT *
+            SELECT bonus_order_id, bonus_order_quantity, user_telegram_id
             FROM bonus_orders 
-            WHERE bonus_location_id = {location_id} AND bonus_order_status = 'Подтвержден, готовится'
+            join users on bonus_order_user_id=user_id
+            WHERE bonus_order_seller_id = (select seller_id from sellers where seller_telegram_id={seller_id}) 
+            AND bonus_order_status = 'Подтвержден, готовится'
+            order by bonus_order_id
             """
         )
 
-    async def get_ready_bonus_orders_by_location_id(self, location_id):
+    async def get_ready_bonus_orders_by_seller_id(self, seller_id):
         """Получаем заказы для локации"""
         return await self.pool.fetch(
             f"""
-            SELECT *
+            SELECT bonus_order_id, bonus_order_quantity, user_telegram_id
             FROM bonus_orders 
-            WHERE bonus_location_id = {location_id} AND bonus_order_status = 'Готов'
+            join users on bonus_order_user_id=user_id
+            WHERE bonus_order_seller_id = (select seller_id from sellers where seller_telegram_id={seller_id}) 
+            AND bonus_order_status = 'Готов'
+            order by bonus_order_id
             """
         )
 
@@ -1250,6 +1322,19 @@ order_date, order_deliver_through, order_pass_to_courier, order_final_price, ord
             AND order_seller_id is null
             AND order_status = 'Ожидание продавца'
             order by order_id
+            """
+        )
+
+    async def get_unaccepted_bonus_orders_by_location_id(self, location_id):
+        """Получаем заказы для локации"""
+        return await self.pool.fetch(
+            f"""
+            SELECT bonus_order_id, bonus_order_date, bonus_order_created_at, bonus_order_quantity
+            FROM bonus_orders 
+            WHERE bonus_order_location_id = {location_id}
+            AND bonus_order_seller_id is null
+            AND bonus_order_status = 'Ожидание продавца'
+            order by bonus_order_id
             """
         )
 
@@ -1358,6 +1443,12 @@ order_final_price, user_telegram_id
             f'select user_telegram_id from users where user_telegram_id = {user_id}'
         )
 
+    async def get_user_id(self, user_tg_id):
+        """Пытаемся получить пользователя из таблицы"""
+        return await self.pool.fetchval(
+            f'select user_id from users where user_telegram_id = {user_tg_id}'
+        )
+
     async def get_user_profile_info(self, user_id):
         """Получаем информацию о пользователе"""
         return await self.pool.fetchrow(
@@ -1431,23 +1522,25 @@ order_final_price, user_telegram_id
         )
 
     async def add_bonus_order(self,
-                              bonus_order_user_telegram_id,
-                              bonus_location_id,
-                              bonus_quantity,
+                              bonus_order_location_id,
+                              bonus_order_date,
+                              bonus_order_user_id,
+                              bonus_order_created_at,
+                              bonus_order_quantity,
                               bonus_order_status):
         """Формируем бунусный заказ"""
         sql = """
-                INSERT INTO bonus_orders (bonus_order_user_telegram_id, bonus_location_id, bonus_quantity, 
-                bonus_order_status) 
-                VALUES ($1, $2, $3, $4)"""
+                INSERT INTO bonus_orders (bonus_order_location_id, bonus_order_date, bonus_order_user_id, 
+                bonus_order_created_at, bonus_order_quantity, bonus_order_status) 
+                VALUES ($1, $2, $3, $4, $5, $6)"""
         done = False
         count = 0
         while not done:
             if count == 15:
                 break
             try:
-                await self.pool.execute(sql, bonus_order_user_telegram_id, bonus_location_id, bonus_quantity,
-                                        bonus_order_status)
+                await self.pool.execute(sql, bonus_order_location_id, bonus_order_date, bonus_order_user_id,
+                                        bonus_order_created_at, bonus_order_quantity, bonus_order_status)
                 done = True
             except asyncpg.exceptions.UniqueViolationError as err:
                 if count == 14:
@@ -1458,7 +1551,8 @@ order_final_price, user_telegram_id
         """Получаем инфу о последнем бонусном заказе"""
         return await self.pool.fetchrow(
             f"SELECT * FROM bonus_orders "
-            f"WHERE bonus_order_user_telegram_id = {user_id} AND bonus_order_status = 'Ожидание продавца'"
+            f"WHERE bonus_order_user_id = (select user_id from users where user_telegram_id={user_id})"
+            f"AND bonus_order_status = 'Ожидание продавца'"
             f"ORDER BY -bonus_order_id"
         )
 
@@ -1469,10 +1563,48 @@ order_final_price, user_telegram_id
             f"WHERE bonus_order_id = {order_id}"
         )
 
-    async def set_bonus_order_status(self, order_id, status):
+    #     async def get_bonus_bonus_little_info(self, bonus_order_id):
+    #         """Получаем информацию о заказе при подтверждении продавцом"""
+    #         return await self.pool.fetchrow(f"""select bonus_order_id, user_id
+    # from bonus_orders
+    # join users on bonus_order_user_id=user_id
+    # where
+    # """)
+
+    async def set_bonus_order_status(self, order_id, status, reason=None):
         """Меняем статус бонусного заказа"""
+        if reason:
+            await self.pool.execute(
+                f"UPDATE bonus_orders SET bonus_order_status = '{status}', "
+                f"bonus_order_reason_for_rejection = '{reason}'"
+                f"WHERE bonus_order_id = {order_id}"
+            )
+        else:
+            await self.pool.execute(
+                f"UPDATE bonus_orders SET bonus_order_status = '{status}'"
+                f"WHERE bonus_order_id = {order_id}"
+            )
+
+    async def set_bonus_order_canceled_at(self, bonus_order_id):
+        """Устанавливаем время отмены заказа"""
         await self.pool.execute(
-            f"UPDATE bonus_orders SET bonus_order_status = '{status}' WHERE bonus_order_id = {order_id}"
+            f"UPDATE bonus_orders SET bonus_order_canceled_at = now()"
+            f"WHERE bonus_order_id = {bonus_order_id}"
+        )
+
+    async def set_bonus_order_delivered_at(self, bonus_order_id):
+        """Устанавливаем время отмены заказа"""
+        await self.pool.execute(
+            f"UPDATE bonus_orders SET bonus_order_delivered_at = now()"
+            f"WHERE bonus_order_id = {bonus_order_id}"
+        )
+
+    async def set_bonus_order_taked(self, order_id):
+        """Продавец принимает заказ"""
+        await self.pool.execute(
+            f"UPDATE bonus_orders SET bonus_order_status = 'Подтвержден, готовится', "
+            f"bonus_order_accepted_at = now()"
+            f"WHERE bonus_order_id = {order_id}"
         )
 
     async def change_bonus_minus(self, user_id, count_bonus):
@@ -2665,6 +2797,18 @@ AND order_status != 'Выполнен'
 ORDER BY order_id"""
         )
 
+    async def get_bonus_orders_for_user(self, user_id):
+        """Получаем активные ордеры"""
+        return await self.pool.fetch(
+            f"""SELECT bonus_order_id, bonus_order_quantity, bonus_order_status
+    FROM bonus_orders WHERE bonus_order_user_id=(select user_id from users where user_telegram_id={user_id})
+    AND bonus_order_status != 'Отменен пользователем до принятия продавцом'
+    AND bonus_order_status != 'Отменен продавцом'
+    AND bonus_order_status != 'Отклонен'
+    AND bonus_order_status != 'Выдан'
+    ORDER BY bonus_order_id"""
+        )
+
     async def im_at_work_seller(self, user_id, status):
         """Устанавливаем статус продавца"""
         await self.pool.execute(
@@ -2997,7 +3141,7 @@ SET delivery_price = '{price}'
     async def get_order_products(self, order_id):
         """Получаем товары из заказа"""
         return await self.pool.fetch(f"""
-SELECT * FROM order_products WHERE op_order_id={order_id}""")
+SELECT * FROM order_products WHERE op_order_id={order_id} order by op_order_id""")
 
     async def get_seller_admin_tg_id(self, order_id):
         """Получаем id админа локации"""
@@ -3019,3 +3163,1304 @@ where local_object_id = (select order_local_object_id from orders where order_id
         if rev:
             return True
         return False
+
+    async def bonus_order_has_review(self, order_id):
+        """Проверяем есть ли уже отзыв к заказу"""
+        rev = await self.pool.fetchval(f"select bonus_order_review from bonus_orders where bonus_order_id ={order_id}")
+        if rev:
+            return True
+        return False
+
+    async def get_bonus_order_user(self, bonus_order_id):
+        """Получаем id пользователя"""
+        return await self.pool.fetchval(f"""select user_telegram_id from users
+where user_id = (select bonus_order_user_id from bonus_orders where bonus_order_id={bonus_order_id})""")
+
+    async def get_seller_admin_location_id(self, user_id):
+        """Получаем id локации админа локации"""
+        return await self.pool.fetchrow(f"""select location_id, location_name
+from admin_sellers
+join  locations on admin_seller_location_id = location_id
+where admin_seller_telegram_id = {user_id}""")
+
+
+    async def get_orders_by_location(self, location_id):
+        """"""
+        return await self.pool.fetch(f"""
+select order_id, order_user_id, order_seller_id, order_courier_id, order_date, order_created_at, order_accepted_at, 
+order_canceled_at, order_time_for_delivery, order_delivered_at, order_deliver_through, order_local_object_id, 
+order_final_price, order_delivery_method, order_status, order_review, order_reason_for_rejection
+from orders 
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+order by order_id;""")
+
+    async def get_orders_by_location_and_date(self, location_id, date):
+        """"""
+        return await self.pool.fetch(f"""
+select order_id, order_user_id, order_seller_id, order_courier_id, order_date, order_created_at, order_accepted_at, 
+order_canceled_at, order_time_for_delivery, order_delivered_at, order_deliver_through, order_local_object_id, 
+order_final_price, order_delivery_method, order_status, order_review, order_reason_for_rejection
+from orders 
+join local_objects on local_object_id = order_local_object_id
+where order_date = '{date}'
+and local_object_location_id = {location_id}
+and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+order by order_id;""")
+
+    async def get_orders_by_location_and_date_period(self, location_id, first_date, last_date):
+        """"""
+        return await self.pool.fetch(f"""
+    select order_id, order_user_id, order_seller_id, order_courier_id, order_date, order_created_at, order_accepted_at, 
+    order_canceled_at, order_time_for_delivery, order_delivered_at, order_deliver_through, order_local_object_id, 
+    order_final_price, order_delivery_method, order_status, order_review, order_reason_for_rejection
+    from orders 
+    join local_objects on local_object_id = order_local_object_id
+    where order_date >= '{first_date}'
+	and order_date <= '{last_date}'
+    and local_object_location_id = {location_id}
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+    order by order_id;""")
+
+    async def get_bonus_orders_by_location(self, location_id):
+        """Получаем бонусные заказы"""
+        return await self.pool.fetch(f"""
+select bonus_order_id, bonus_order_date, bonus_order_user_id, bonus_order_seller_id, bonus_order_created_at,
+bonus_order_accepted_at, bonus_order_canceled_at, bonus_order_delivered_at, bonus_order_quantity, bonus_order_status,
+bonus_order_review, bonus_order_reason_for_rejection
+from bonus_orders
+where bonus_order_location_id = {location_id}
+and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом')
+order by bonus_order_id
+""")
+
+    async def get_bonus_orders_by_location_and_date(self, location_id, date):
+        """Получаем бонусные заказы"""
+        return await self.pool.fetch(f"""
+select bonus_order_id, bonus_order_date, bonus_order_user_id, bonus_order_seller_id, bonus_order_created_at,
+bonus_order_accepted_at, bonus_order_canceled_at, bonus_order_delivered_at, bonus_order_quantity, bonus_order_status,
+bonus_order_review, bonus_order_reason_for_rejection
+from bonus_orders
+where bonus_order_date = '{date}'
+and bonus_order_location_id = {location_id}
+and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом')
+order by bonus_order_id
+""")
+
+    async def get_bonus_orders_by_location_and_date_period(self, location_id, first_date, last_date):
+        """Получаем бонусные заказы"""
+        return await self.pool.fetch(f"""
+    select bonus_order_id, bonus_order_date, bonus_order_user_id, bonus_order_seller_id, bonus_order_created_at,
+    bonus_order_accepted_at, bonus_order_canceled_at, bonus_order_delivered_at, bonus_order_quantity, bonus_order_status,
+    bonus_order_review, bonus_order_reason_for_rejection
+    from bonus_orders
+    where bonus_order_date >= '{first_date}'
+	and bonus_order_date <= '{last_date}'
+    and bonus_order_location_id = {location_id}
+    and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом')
+    order by bonus_order_id
+    """)
+
+    async def get_first_order_date(self, location_id):
+        """Получаем первый день периода"""
+        return await self.pool.fetchval(f"""
+        select order_date
+        from orders 
+        join local_objects on local_object_id = order_local_object_id
+        where local_object_location_id = {location_id}
+        and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+        order by order_id;""")
+
+    async def get_last_order_date(self, location_id):
+        """Получаем первый день периода"""
+        return await self.pool.fetchval(f"""
+        select order_date
+        from orders 
+        join local_objects on local_object_id = order_local_object_id
+        where local_object_location_id = {location_id}
+        and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+        order by -order_id;""")
+
+    async def get_indicators_by_location(self, location_id):
+        return await self.pool.fetchrow(f"""
+select DISTINCT (SELECT
+   COUNT(*) 
+FROM 
+   orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+AND
+   order_status = 'Выполнен') as completed,
+   
+   
+(SELECT
+   SUM(order_final_price) 
+FROM 
+   orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+AND
+   order_status = 'Выполнен') as completed_price,
+   
+   
+   (SELECT
+   COUNT(*) 
+FROM 
+   orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+AND
+   order_status = 'Отклонен продавцом') as canceled_by_seller,
+   
+   
+ (SELECT
+    SUM(order_final_price) 
+FROM 
+   orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+AND
+   order_status = 'Отклонен продавцом') as canceled_by_seller_price,
+   
+   
+   (SELECT
+   COUNT(*) 
+FROM 
+   orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+AND
+   order_status = 'Отменен курьером') as canceled_by_courier,
+   
+   
+(SELECT
+    SUM(order_final_price)
+FROM 
+   orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+AND
+   order_status = 'Отменен курьером') as canceled_by_courier_price,
+   
+   
+   (SELECT
+   COUNT(*) 
+FROM orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+AND
+   order_status = 'Отменен пользователем') as canceled_by_client,
+   
+   
+(SELECT
+   SUM(order_final_price)
+FROM 
+   orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+AND
+   order_status = 'Отменен пользователем') as canceled_by_client_price,
+   
+   
+(SELECT  COUNT(*) 
+FROM orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+
+(SELECT  
+ SUM(order_final_price) 
+FROM orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders_price
+
+
+from orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')""")
+
+    async def get_indicators_by_location_and_date(self, location_id, date):
+        return await self.pool.fetchrow(f"""
+    select DISTINCT (SELECT
+       COUNT(*) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    AND
+       order_status = 'Выполнен') as completed,
+
+
+    (SELECT
+       SUM(order_final_price) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    AND
+       order_status = 'Выполнен') as completed_price,
+
+
+       (SELECT
+       COUNT(*) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    AND
+       order_status = 'Отклонен продавцом') as canceled_by_seller,
+
+
+     (SELECT
+        SUM(order_final_price) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    AND
+       order_status = 'Отклонен продавцом') as canceled_by_seller_price,
+
+
+       (SELECT
+       COUNT(*) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    AND
+       order_status = 'Отменен курьером') as canceled_by_courier,
+
+
+    (SELECT
+        SUM(order_final_price)
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    AND
+       order_status = 'Отменен курьером') as canceled_by_courier_price,
+
+
+       (SELECT
+       COUNT(*) 
+    FROM orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    AND
+       order_status = 'Отменен пользователем') as canceled_by_client,
+
+
+    (SELECT
+       SUM(order_final_price)
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    AND
+       order_status = 'Отменен пользователем') as canceled_by_client_price,
+
+
+    (SELECT  COUNT(*) 
+    FROM orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+
+    (SELECT  
+     SUM(order_final_price) 
+    FROM orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders_price
+
+
+    from orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date = '{date}'
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')""")
+
+    async def get_indicators_by_location_and_date_period(self, location_id, first_date, last_date):
+        return await self.pool.fetchrow(f"""
+    select DISTINCT (SELECT
+       COUNT(*) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    AND
+       order_status = 'Выполнен') as completed,
+
+
+    (SELECT
+       SUM(order_final_price) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    AND
+       order_status = 'Выполнен') as completed_price,
+
+
+       (SELECT
+       COUNT(*) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    AND
+       order_status = 'Отклонен продавцом') as canceled_by_seller,
+
+
+     (SELECT
+        SUM(order_final_price) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    AND
+       order_status = 'Отклонен продавцом') as canceled_by_seller_price,
+
+
+       (SELECT
+       COUNT(*) 
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    AND
+       order_status = 'Отменен курьером') as canceled_by_courier,
+
+
+    (SELECT
+        SUM(order_final_price)
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    AND
+       order_status = 'Отменен курьером') as canceled_by_courier_price,
+
+
+       (SELECT
+       COUNT(*) 
+    FROM orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    AND
+       order_status = 'Отменен пользователем') as canceled_by_client,
+
+
+    (SELECT
+       SUM(order_final_price)
+    FROM 
+       orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    AND
+       order_status = 'Отменен пользователем') as canceled_by_client_price,
+
+
+    (SELECT  COUNT(*) 
+    FROM orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+
+    (SELECT  
+     SUM(order_final_price) 
+    FROM orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders_price
+
+
+    from orders
+    join local_objects on local_object_id = order_local_object_id
+    where local_object_location_id = {location_id}
+    and order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')""")
+
+
+
+
+    async def get_bonus_indicators(self, location_id):
+        return await self.pool.fetchrow(f"""
+select DISTINCT (SELECT
+   COUNT(*) 
+FROM 
+   bonus_orders
+where bonus_order_location_id = {location_id}
+AND bonus_order_status = 'Выдан') as completed,
+   
+     
+(SELECT
+   COUNT(*) 
+FROM 
+   bonus_orders
+where bonus_order_location_id = {location_id}
+AND
+   bonus_order_status = 'Отменен продавцом') as canceled_by_seller,
+   
+   
+(SELECT
+   COUNT(*) 
+FROM bonus_orders
+where bonus_order_location_id = {location_id}
+AND
+   bonus_order_status = 'Отменен пользователем до принятия продавцом') as canceled_by_client,
+   
+   
+   
+(SELECT  COUNT(*) 
+FROM bonus_orders
+where bonus_order_location_id = {location_id}
+and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом')) as all_orders
+
+
+
+from bonus_orders
+where  bonus_order_location_id = {location_id}
+and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом');""")
+
+    async def get_bonus_indicators_by_location_date(self, location_id, date):
+        return await self.pool.fetchrow(f"""
+    select DISTINCT (SELECT
+       COUNT(*) 
+    FROM 
+       bonus_orders
+    where bonus_order_location_id = {location_id}
+    and bonus_order_date = '{date}'
+    AND bonus_order_status = 'Выдан') as completed,
+
+
+    (SELECT
+       COUNT(*) 
+    FROM 
+       bonus_orders
+    where bonus_order_location_id = {location_id}
+    and bonus_order_date = '{date}'
+    AND
+       bonus_order_status = 'Отменен продавцом') as canceled_by_seller,
+
+
+    (SELECT
+       COUNT(*) 
+    FROM bonus_orders
+    where bonus_order_location_id = {location_id}
+    and bonus_order_date = '{date}'
+    AND
+       bonus_order_status = 'Отменен пользователем до принятия продавцом') as canceled_by_client,
+
+
+
+    (SELECT  COUNT(*) 
+    FROM bonus_orders
+    where bonus_order_location_id = {location_id}
+    and bonus_order_date = '{date}'
+    and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом')) as all_orders
+
+
+
+    from bonus_orders
+    where  bonus_order_location_id = {location_id}
+    and bonus_order_date = '{date}'
+    and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом');""")
+
+    async def get_bonus_indicators_by_location_date_period(self, location_id, first_date, last_date):
+        return await self.pool.fetchrow(f"""
+    select DISTINCT (SELECT
+       COUNT(*) 
+    FROM 
+       bonus_orders
+    where bonus_order_location_id = {location_id}
+    and bonus_order_date >= '{first_date}'
+    and bonus_order_date <= '{last_date}'
+    AND bonus_order_status = 'Выдан') as completed,
+
+
+    (SELECT
+       COUNT(*) 
+    FROM 
+       bonus_orders
+    where bonus_order_location_id = {location_id}
+    and bonus_order_date >= '{first_date}'
+    and bonus_order_date <= '{last_date}'
+    AND
+       bonus_order_status = 'Отменен продавцом') as canceled_by_seller,
+
+
+    (SELECT
+       COUNT(*) 
+    FROM bonus_orders
+    where bonus_order_location_id = {location_id}
+    and bonus_order_date >= '{first_date}'
+    and bonus_order_date <= '{last_date}'
+    AND
+       bonus_order_status = 'Отменен пользователем до принятия продавцом') as canceled_by_client,
+
+
+
+    (SELECT  COUNT(*) 
+    FROM bonus_orders
+    where bonus_order_location_id = {location_id}
+    and bonus_order_date >= '{first_date}'
+    and bonus_order_date <= '{last_date}'
+    and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом')) as all_orders
+
+
+
+    from bonus_orders
+    where  bonus_order_location_id = {location_id}
+    and bonus_order_date >= '{first_date}'
+    and bonus_order_date <= '{last_date}'
+    and bonus_order_status in ('Выдан', 'Отменен продавцом', 'Отменен пользователем до принятия продавцом');""")
+
+    async def get_seller_ids_by_location(self, location_id):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+select distinct order_seller_id
+from orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+order by order_seller_id""")
+
+    async def get_seller_ids_by_location_and_date(self, location_id, date):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+    select distinct order_seller_id
+    from orders
+    join local_objects on local_object_id = order_local_object_id
+    where order_date = '{date}'
+    and local_object_location_id = {location_id}
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+    order by order_seller_id""")
+
+    async def get_seller_ids_by_location_and_date_period(self, location_id, first_date, last_date):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+    select distinct order_seller_id
+    from orders
+    join local_objects on local_object_id = order_local_object_id
+    where order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    and local_object_location_id = {location_id}
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+    order by order_seller_id""")
+
+    async def get_courier_ids_by_location(self, location_id):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+select distinct order_courier_id
+from orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+and order_courier_id is not null
+order by order_courier_id""")
+
+    async def get_courier_ids_by_location_and_date(self, location_id, date):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+    select distinct order_courier_id
+    from orders
+    join local_objects on local_object_id = order_local_object_id
+    where order_date = '{date}'
+    and local_object_location_id = {location_id}
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+    and order_courier_id is not null
+    order by order_courier_id""")
+
+    async def get_courier_ids_by_location_and_date_period(self, location_id, first_date, last_date):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+    select distinct order_courier_id
+    from orders
+    join local_objects on local_object_id = order_local_object_id
+    where order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    and local_object_location_id = {location_id}
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+    and order_courier_id is not null
+    order by order_courier_id""")
+
+    async def get_clients_ids_by_location(self, location_id):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+select distinct order_user_id
+from orders
+join local_objects on local_object_id = order_local_object_id
+where local_object_location_id = {location_id}
+and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+order by order_user_id""")
+
+    async def get_clients_ids_by_location_and_date(self, location_id, date):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+    select distinct order_user_id
+    from orders
+    join local_objects on local_object_id = order_local_object_id
+    where order_date = '{date}'
+    and local_object_location_id = {location_id}
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+    order by order_user_id""")
+
+    async def get_clients_ids_by_location_and_date_period(self, location_id, first_date, last_date):
+        """Получаем id продавцов"""
+        return await self.pool.fetch(f"""
+    select distinct order_user_id
+    from orders
+    join local_objects on local_object_id = order_local_object_id
+    where order_date >= '{first_date}'
+    and order_date <= '{last_date}'
+    and local_object_location_id = {location_id}
+    and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+    order by order_user_id""")
+
+    async def get_seller_info(self, seller_id):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+select (select count(*)
+	   from orders
+	   where order_seller_id={seller_id}
+	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+	   
+	   (select count(*)
+	   from orders
+	   where order_seller_id={seller_id}
+	   and order_status = 'Выполнен') as completed_orders,
+	   
+	   (select count(*)
+	   from orders
+	   where order_seller_id={seller_id}
+	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+	   
+	   (select count(*)
+	   from orders
+	   where order_seller_id={seller_id}
+	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+	   
+	   (select count(*)
+	   from orders
+	   where order_seller_id={seller_id}
+	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+	   
+	   (select count(*)
+	   from bonus_orders
+	   where bonus_order_seller_id={seller_id}
+	   and bonus_order_status in ('Выдан', 'Отменен продавцом')) as all_bonus_orders,
+	   
+	   (select count(*)
+	   from bonus_orders
+	   where bonus_order_seller_id={seller_id}
+	   and bonus_order_status = 'Выдан') as completed_bonus_orders,
+	   
+	   (select count(*)
+	   from bonus_orders
+	   where bonus_order_seller_id={seller_id}
+	   and bonus_order_status = 'Отменен продавцом') as canceled_bonus_orders,
+	   
+	   seller_telegram_id, seller_name
+
+from sellers
+where seller_id = {seller_id}""")
+
+    async def get_seller_info_by_date(self, seller_id, date):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+    select (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date = '{date}'
+    	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date = '{date}'
+    	   and order_status = 'Выполнен') as completed_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date = '{date}'
+    	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date = '{date}'
+    	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date = '{date}'
+    	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+    	   where bonus_order_seller_id={seller_id}
+           and bonus_order_date = '{date}'
+    	   and bonus_order_status in ('Выдан', 'Отменен продавцом')) as all_bonus_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+    	   where bonus_order_seller_id={seller_id}
+           and bonus_order_date = '{date}'
+    	   and bonus_order_status = 'Выдан') as completed_bonus_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+    	   where bonus_order_seller_id={seller_id}
+           and bonus_order_date = '{date}'
+    	   and bonus_order_status = 'Отменен продавцом') as canceled_bonus_orders,
+
+    	   seller_telegram_id, seller_name
+
+    from sellers
+    where seller_id = {seller_id}""")
+
+    async def get_seller_info_by_date_period(self, seller_id, first_date, last_date):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+    select (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status = 'Выполнен') as completed_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_seller_id={seller_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+    	   where bonus_order_seller_id={seller_id}
+           and bonus_order_date >= '{first_date}'
+           and bonus_order_date <= '{last_date}'
+    	   and bonus_order_status in ('Выдан', 'Отменен продавцом')) as all_bonus_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+    	   where bonus_order_seller_id={seller_id}
+           and bonus_order_date >= '{first_date}'
+           and bonus_order_date <= '{last_date}'
+    	   and bonus_order_status = 'Выдан') as completed_bonus_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+    	   where bonus_order_seller_id={seller_id}
+           and bonus_order_date >= '{first_date}'
+           and bonus_order_date <= '{last_date}'
+    	   and bonus_order_status = 'Отменен продавцом') as canceled_bonus_orders,
+
+    	   seller_telegram_id, seller_name
+
+    from sellers
+    where seller_id = {seller_id}""")
+
+    async def get_client_info(self, user_id, location_id):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+select (select count(*)
+	   from orders
+       join local_objects on local_object_id = order_local_object_id
+       where local_object_location_id = {location_id}
+	   and order_user_id={user_id}
+	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+	   
+	   (select count(*)
+	   from orders
+       join local_objects on local_object_id = order_local_object_id
+       where local_object_location_id = {location_id}
+	   and order_user_id={user_id}
+	   and order_status = 'Выполнен') as completed_orders,
+	   
+	   (select count(*)
+	   from orders
+       join local_objects on local_object_id = order_local_object_id
+       where local_object_location_id = {location_id}
+	   and order_user_id={user_id}
+	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+	   
+	   (select count(*)
+	   from orders
+       join local_objects on local_object_id = order_local_object_id
+       where local_object_location_id = {location_id}
+	   and order_user_id={user_id}
+	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+	   
+	   (select count(*)
+	   from orders
+       join local_objects on local_object_id = order_local_object_id
+       where local_object_location_id = {location_id}
+	   and order_user_id={user_id}
+	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+	   
+	   (select count(*)
+	   from bonus_orders
+       where bonus_order_location_id = {location_id}
+	   and bonus_order_user_id={user_id}
+	   and bonus_order_status in ('Выдан', 'Отменен продавцом')) as all_bonus_orders,
+	   
+	   (select count(*)
+	   from bonus_orders
+       where bonus_order_location_id = {location_id}
+	   and bonus_order_user_id={user_id}
+	   and bonus_order_status = 'Выдан') as completed_bonus_orders,
+	   
+	   (select count(*)
+	   from bonus_orders
+       where bonus_order_location_id = {location_id}
+	   and bonus_order_user_id={user_id}
+	   and bonus_order_status = 'Отменен продавцом') as canceled_bonus_orders,
+	   
+	   user_telegram_id
+
+from users
+where user_id = {user_id}
+""")
+
+    async def get_client_info_by_date(self, user_id, location_id, date):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+    select (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date = '{date}'
+    	   and order_user_id={user_id}
+    	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+    	   (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date = '{date}'
+    	   and order_user_id={user_id}
+    	   and order_status = 'Выполнен') as completed_orders,
+
+    	   (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date = '{date}'
+    	   and order_user_id={user_id}
+    	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+
+    	   (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date = '{date}'
+    	   and order_user_id={user_id}
+    	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+
+    	   (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date = '{date}'
+    	   and order_user_id={user_id}
+    	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+           where bonus_order_location_id = {location_id}
+           and bonus_order_date = '{date}'
+    	   and bonus_order_user_id={user_id}
+    	   and bonus_order_status in ('Выдан', 'Отменен продавцом')) as all_bonus_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+           where bonus_order_location_id = {location_id}
+           and bonus_order_date = '{date}'
+    	   and bonus_order_user_id={user_id}
+    	   and bonus_order_status = 'Выдан') as completed_bonus_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+           where bonus_order_location_id = {location_id}
+           and bonus_order_date = '{date}'
+    	   and bonus_order_user_id={user_id}
+    	   and bonus_order_status = 'Отменен продавцом') as canceled_bonus_orders,
+
+    	   user_telegram_id
+
+    from users
+    where user_id = {user_id}
+    """)
+
+    async def get_client_info_by_date_period(self, user_id, location_id, first_date, last_date):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+    select (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_user_id={user_id}
+    	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+    	   (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_user_id={user_id}
+    	   and order_status = 'Выполнен') as completed_orders,
+
+    	   (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_user_id={user_id}
+    	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+
+    	   (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_user_id={user_id}
+    	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+
+    	   (select count(*)
+    	   from orders
+           join local_objects on local_object_id = order_local_object_id
+           where local_object_location_id = {location_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_user_id={user_id}
+    	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+           where bonus_order_location_id = {location_id}
+           and bonus_order_date >= '{first_date}'
+           and bonus_order_date <= '{last_date}'
+    	   and bonus_order_user_id={user_id}
+    	   and bonus_order_status in ('Выдан', 'Отменен продавцом')) as all_bonus_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+           where bonus_order_location_id = {location_id}
+           and bonus_order_date >= '{first_date}'
+           and bonus_order_date <= '{last_date}'
+    	   and bonus_order_user_id={user_id}
+    	   and bonus_order_status = 'Выдан') as completed_bonus_orders,
+
+    	   (select count(*)
+    	   from bonus_orders
+           where bonus_order_location_id = {location_id}
+           and bonus_order_date >= '{first_date}'
+           and bonus_order_date <= '{last_date}'
+    	   and bonus_order_user_id={user_id}
+    	   and bonus_order_status = 'Отменен продавцом') as canceled_bonus_orders,
+
+    	   user_telegram_id
+
+    from users
+    where user_id = {user_id}
+    """)
+
+    async def get_courier_info(self, courier_id):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+select (select count(*)
+	   from orders
+	   where order_courier_id={courier_id}
+	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+	   
+	   (select count(*)
+	   from orders
+	   where order_courier_id={courier_id}
+	   and order_status = 'Выполнен') as completed_orders,
+	   
+	   (select count(*)
+	   from orders
+	   where order_courier_id={courier_id}
+	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+	   
+	   (select count(*)
+	   from orders
+	   where order_courier_id={courier_id}
+	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+	   
+	   (select count(*)
+	   from orders
+	   where order_courier_id={courier_id}
+	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+	   
+	   courier_telegram_id, courier_name
+
+from couriers
+where courier_id = {courier_id}""")
+
+    async def get_courier_info_by_date(self, courier_id, date):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+    select (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date = '{date}'
+    	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date = '{date}'
+    	   and order_status = 'Выполнен') as completed_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date = '{date}'
+    	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date = '{date}'
+    	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date = '{date}'
+    	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+
+    	   courier_telegram_id, courier_name
+
+    from couriers
+    where courier_id = {courier_id}""")
+
+    async def get_courier_info_by_date_period(self, courier_id, first_date, last_date):
+        """Получаем статистику продавца за период"""
+        return await self.pool.fetchrow(f"""
+    select (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')) as all_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status = 'Выполнен') as completed_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status = 'Отклонен продавцом') as canceled_by_seller_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status = 'Отменен пользователем') as canceled_by_client_orders,
+
+    	   (select count(*)
+    	   from orders
+    	   where order_courier_id={courier_id}
+           and order_date >= '{first_date}'
+           and order_date <= '{last_date}'
+    	   and order_status = 'Отменен курьером') as canceled_by_courier_orders,
+
+    	   courier_telegram_id, courier_name
+
+    from couriers
+    where courier_id = {courier_id}""")
+
+
+    async def test_users(self):
+        return await self.pool.fetch(
+            "select user_id from users"
+        )
+
+    async def test_local(self):
+        return await self.pool.fetch(
+            "select local_object_id from local_objects where is_local_object_available = True"
+        )
+
+    async def test_sellers(self, local):
+        return await self.pool.fetch(
+            f"select seller_id from sellers where seller_status = True and seller_location_id = (select local_object_location_id from local_objects where local_object_id = {local})"
+        )
+
+    async def test_courier(self, local):
+        return await self.pool.fetch(
+            f"select courier_id from couriers where courier_status = True and courier_location_id = (select local_object_location_id from local_objects where local_object_id = {local})"
+        )
+
+    async def test_order(self,
+                         order_year,
+                         order_month,
+                         order_user_id,
+                         order_seller_id,
+                         order_date,
+                         order_created_at,
+                         order_accepted_at,
+                         order_time_for_delivery,
+                         order_deliver_through,
+                         order_local_object_id,
+                         order_delivery_method,
+                         order_status,
+                         order_canceled_at=None,
+                         order_delivered_at=None,
+                         order_review=None,
+                         order_reason_for_rejection=None,
+                         order_courier_id=None):
+        """Добавляем новый заказ в таблицу"""
+        sql = """
+        INSERT INTO orders (order_user_id, order_seller_id, order_courier_id, order_date,
+        order_created_at, order_accepted_at, order_canceled_at, order_time_for_delivery, 
+        order_delivered_at, order_deliver_through, order_local_object_id, 
+        order_delivery_method, order_status, order_review, order_reason_for_rejection, order_year, order_month) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)"""
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, order_user_id, order_seller_id, order_courier_id, order_date,
+        order_created_at, order_accepted_at, order_canceled_at, order_time_for_delivery,
+        order_delivered_at, order_deliver_through, order_local_object_id,
+        order_delivery_method, order_status, order_review, order_reason_for_rejection, order_year, order_month)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
+                count += 1
+
+    async def test_price(self, order_id, price):
+        await self.pool.execute(f"""UPDATE orders SET order_final_price = {price} where order_id={order_id}""")
+
+
+    async def test_products(self, quant):
+        return await self.pool.fetch(f"""select * from products where is_product_available=True
+LIMIT {quant}""")
+
+    async def test_order_product(self, op_order_id, op_product_id, op_product_name, op_quantity,
+                                 op_price_per_unit, op_price):
+        """Добавляем выбранные товары к заказу"""
+        sql = """
+                INSERT INTO order_products (op_order_id, op_product_id, op_product_name, op_quantity,
+                 op_price_per_unit, op_price) 
+                VALUES ($1, $2, $3, $4, $5, $6)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, op_order_id, op_product_id, op_product_name, op_quantity,
+                 op_price_per_unit, op_price)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
+                count += 1
+
+    async def test_last_order(self):
+        """Получаем id последнего заказа пользователя"""
+        return await self.pool.fetchval(
+            f'SELECT order_id FROM orders ORDER BY -order_id'
+        )
+
+    async def get_orders_years(self):
+        """Получаем годы"""
+        return await self.pool.fetch(f"select distinct order_year from orders order by order_year")
+
+    async def get_orders_months(self, year):
+        """Получаем месяца"""
+        return await self.pool.fetch(f"""select distinct order_month 
+from orders 
+where order_year = {year}
+order by order_month""")
+
+    async def get_orders_days(self, year, month):
+        """Получаем месяца"""
+        return await self.pool.fetch(f"""select distinct order_date 
+    from orders 
+    where order_year = {year}
+    and order_month = {month}
+    order by order_date""")
+

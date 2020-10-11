@@ -2,7 +2,8 @@ import logging
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from keyboards.inline.callback_datas import confirm_order_seller_data, confirm_bonus_order, remove_from_cart_data
+from keyboards.inline.callback_datas import confirm_order_seller_data, confirm_bonus_order, remove_from_cart_data, \
+    cancel_bonus_order_data_sellers
 from loader import bot
 from utils.emoji import success_em, attention_em
 from utils.product_list import get_product_list
@@ -55,7 +56,9 @@ async def send_delivery_cart(orders, user_id):
 async def send_message_to_sellers_bonus(sellers_list, order_info):
     """Отправляем сообщение продавцам"""
     message = f"""Новый бонусный заказ № {order_info['bonus_order_id']}!
-Количество бонусных роллов: {order_info['bonus_quantity']}
+Количество бонусных роллов: {order_info['bonus_order_quantity']} 
+Дата заказа: {order_info['bonus_order_date'].strftime("%d.%m.%Y")}
+Время заказа: {order_info['bonus_order_created_at'].strftime("%H:%M")}
 Пожалуйста, подойдите к кассе и, после выбора роллов клиентом, подтвердите заказ"""
     for seller in sellers_list:
         try:
@@ -65,9 +68,18 @@ async def send_message_to_sellers_bonus(sellers_list, order_info):
                                        inline_keyboard=[
                                            [
                                                InlineKeyboardButton(
-                                                   text=f'Подтвердить бонусный заказ № {order_info["bonus_order_id"]}',
+                                                   text=f'Подтвердить бонусный заказ № {order_info["bonus_order_id"]}Б',
                                                    callback_data=confirm_bonus_order.new(
                                                        b_order_id=order_info["bonus_order_id"])
+                                               )
+                                           ],
+                                           [
+                                               InlineKeyboardButton(
+                                                   text=f'Отклонить бонусный заказ № {order_info["bonus_order_id"]}Б',
+                                                   callback_data=cancel_bonus_order_data_sellers.new(
+                                                       b_order_id=order_info["bonus_order_id"],
+                                                       quantity=order_info['bonus_order_quantity']
+                                                   )
                                                )
                                            ]
 

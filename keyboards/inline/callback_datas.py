@@ -49,6 +49,7 @@ confirm_bonus_order = CallbackData('confirm_bonus', 'b_order_id')
 
 cancel_bonus_order_data = CallbackData('cancel_bonus', 'b_order_id', 'quantity')
 
+cancel_bonus_order_data_sellers = CallbackData('cancel_bonus', 'b_order_id', 'quantity')
 
 admin_data = CallbackData('delete_admin', 'admin_id')
 
@@ -86,3 +87,15 @@ confirm_delivery_order = CallbackData('confirm', 'order_id')
 dont_take_delivery_order = CallbackData('dont_take', 'order_id')
 
 reviev_order_data = CallbackData('review', 'order_id')
+
+reviev_bonus_order_data = CallbackData('bonus_review', 'order_id')
+
+statistics_date_data = CallbackData('st_date', 'period')
+
+statistics_year_data = CallbackData('year_data', 'year')
+
+statistics_year_month_data = CallbackData('year_month', 'year', 'month')
+
+statistics_day_data = CallbackData('day_data', 'day', 'month', 'year')
+
+

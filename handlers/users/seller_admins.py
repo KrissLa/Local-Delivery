@@ -659,8 +659,6 @@ async def confirm_delivery_order(call: CallbackQuery, state: FSMContext):
     date_list = delivery_order['date'].split('.')
     delivery_date = date(int(date_list[2]), int(date_list[1]), int(date_list[0]))
     delivery_order['delivery_date'] = date(int(date_list[2]), int(date_list[1]), int(date_list[0]))
-    logging.info(delivery_date)
-    logging.info(delivery_order['delivery_date'])
     delivery_time = time(delivery_order['delivery_time'], 0)
     delivery_order['delivery_time'] = time(delivery_order['delivery_time'], 0)
     delivery_datetime = datetime.combine(delivery_date, delivery_time)

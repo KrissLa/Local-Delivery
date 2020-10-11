@@ -9,7 +9,8 @@ from keyboards.inline.callback_datas import metro_data, categories_data, product
     back_to_size_from_price_list_data, need_pass_data, couriers_data, active_order_data, active_bonus_order_data, \
     admin_data, metro_del_data, location_data, new_item_size, edit_item_data, cancel_order_data, \
     delivery_categories_data, delivery_product_data, delivery_product_count_data, delivery_date_data, \
-    delivery_time_data, take_delivery_order, dont_take_delivery_order, confirm_delivery_order, active_order_cancel_data
+    delivery_time_data, take_delivery_order, dont_take_delivery_order, confirm_delivery_order, active_order_cancel_data, \
+    cancel_bonus_order_data_sellers
 from loader import db
 from utils.pagination import add_pagination
 from utils.temp_orders_list import get_formatted_date
@@ -706,9 +707,18 @@ async def generate_active_bonus_order_keyboard(order):
     active_orders_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text='Заказ готов',
+                text=f'Бонусный заказ № {order["bonus_order_id"]}Б готов',
                 callback_data=active_bonus_order_data.new(order_id=order['bonus_order_id'],
-                                                          user_id=order['bonus_order_user_telegram_id'])
+                                                          user_id=order['user_telegram_id'])
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=f'Отменить бонусный заказ № {order["bonus_order_id"]}Б',
+                callback_data=cancel_bonus_order_data_sellers.new(
+                    b_order_id=order["bonus_order_id"],
+                    quantity=order['bonus_order_quantity']
+                )
             )
         ]
     ])

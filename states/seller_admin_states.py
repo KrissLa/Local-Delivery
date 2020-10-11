@@ -41,3 +41,7 @@ class SellerAdmin(StatesGroup):
 
     WaitCancelConfirm = State()
 
+    Year = State()
+    Month = State()
+    Day = State()
+

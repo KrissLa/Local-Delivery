@@ -6,7 +6,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from filters.users_filters import IsAdminMessage
 from keyboards.default.menu import menu_keyboard
-from keyboards.inline.callback_datas import bonuses_data
+from keyboards.inline.callback_datas import bonuses_data, cancel_bonus_order_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_categories, generate_keyboard_with_none_categories, \
     generate_keyboard_with_metro, cart_markup, cancel_order_by_use_button
 from loader import db, dp
@@ -60,6 +60,7 @@ async def cart(message: types.Message, state: FSMContext):
                          'Вы в главном меню',
                          reply_markup=menu_keyboard)
 
+
 @dp.message_handler(commands=['order_status'], state=['*'])
 async def get_order_status(message: types.Message, state: FSMContext):
     """Статус заказа"""
@@ -91,13 +92,38 @@ async def get_order_status(message: types.Message, state: FSMContext):
                                          reply_markup=await cancel_order_by_use_button(order['order_id']))
                 else:
                     await message.answer(f"Заказ № {order['order_id']}\n"
-                                         f"{await get_product_list(order['order_id'])}"
+                                         f"{await get_product_list(order['order_id'])}\n"
                                          f"Стоимость: {order['order_final_price']} руб.\n"
                                          f"Статус заказа - {order['order_status']}\n\n",
                                          reply_markup=await cancel_order_by_use_button(order['order_id']))
         await Menu.OrderStatus.set()
     else:
         await message.answer('Нет активных заказов')
+
+
+@dp.message_handler(commands=['bonus_order_status'], state=['*'])
+async def get_order_status(message: types.Message, state: FSMContext):
+    """Статус заказа"""
+    await reset_state(state, message)
+    orders = await db.get_bonus_orders_for_user(message.from_user.id)
+    if orders:
+        await message.answer("Активные бонусные заказы:")
+        for order in orders:
+            await message.answer(f"Бонусный заказ № {order['bonus_order_id']}Б\n"
+                                 f"Количество роллов - {order['bonus_order_quantity']}\n"
+                                 f"Статус заказа - {order['bonus_order_status']}\n\n",
+                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                     [
+                                         InlineKeyboardButton(
+                                             text='Отменить заказ',
+                                             callback_data=cancel_bonus_order_data.new(
+                                                 b_order_id=order['bonus_order_id'],
+                                                 quantity=order['bonus_order_quantity'])
+                                         )
+                                     ]
+                                 ]))
+    else:
+        await message.answer('Нет активных бонусных заказов')
 
 
 @dp.message_handler(IsAdminMessage(), commands=['first_start'], state=['*'])

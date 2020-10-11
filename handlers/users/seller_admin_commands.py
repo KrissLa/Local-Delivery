@@ -1,15 +1,21 @@
+import logging
+import os
+
+import xlsxwriter
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 
 from filters.users_filters import IsSellerAdminMessage, SellerAdminHasLocationMessage
 from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_keyboard_with_delivery_categories, \
     generate_keyboard_with_none_categories, generate_keyboard_with_categories_for_add_item
-from loader import dp, db
+from keyboards.inline.statistics_keyboards import period_markup
+from loader import dp, db, bot
 from states.seller_admin_states import SellerAdmin
 from utils.check_states import states_for_menu, reset_state
 from utils.emoji import attention_em_red
 from utils.temp_orders_list import get_list_of_delivery_orders, get_list_of_sellers_location, \
     get_list_of_couriers_location, get_list_of_category_for_remove_from_stock, get_list_of_category_for_return_to_stock
+from utils.test import generate_table
 
 
 @dp.message_handler(IsSellerAdminMessage(), commands=['change_delivery_order'], state=states_for_menu)
@@ -190,3 +196,24 @@ async def return_item_to_stock(message: types.Message, state: FSMContext):
                              reply_markup=cancel_admin_markup)
 
     await SellerAdmin.ReturnItemToStockCategory.set()
+
+
+@dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['get_statistics'], state='*')
+async def get_statistics(message: types.Message, state: FSMContext):
+    """Получить статистику"""
+    await reset_state(state, message)
+    await message.answer('Выберите период врмени, за который хотите получить статистику',
+                         reply_markup=period_markup)
+
+
+@dp.message_handler(IsSellerAdminMessage(), commands=['gen_orders'], state='*')
+async def get_report(message: types.Message):
+    """Получаем статистику"""
+    await generate_table()
+
+
+@dp.message_handler(IsSellerAdminMessage(), commands=['get_report'], state='*')
+async def get_report(message: types.Message):
+    """Получаем статистику"""
+    workbook = xlsxwriter.Workbook('hello.xlsx')
+

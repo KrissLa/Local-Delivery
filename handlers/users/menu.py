@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardBut
 
 from keyboards.default.menu import menu_keyboard
 from keyboards.inline.callback_datas import categories_data, product_list_data, size_product_data, \
-    product_count_price_data, need_pass_data, deliver_to_time_data, reviev_order_data
+    product_count_price_data, need_pass_data, deliver_to_time_data, reviev_order_data, reviev_bonus_order_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_categories, generate_keyboard_with_products, \
     generate_keyboard_with_count_and_prices, generate_keyboard_with_sizes, \
     generate_keyboard_with_count_and_prices_for_size, delivery_options_markup, \
@@ -450,7 +450,9 @@ async def user_confirm_order(call: CallbackQuery, state: FSMContext):
         await db.update_order_status_and_date(order_id_location["order_id"],
                                               order_date.strftime("%Y-%m-%d"),
                                               order_date.strftime("%H:%M"),
-                                              'Ожидание продавца')
+                                              'Ожидание продавца',
+                                              int(order_date.strftime("%Y")),
+                                              int(order_date.strftime("%m")))
         temp_orders = await db.get_temp_orders(call.from_user.id)
         for order in temp_orders:
             await db.add_order_product(order_id_location["order_id"], order)
@@ -474,30 +476,34 @@ async def get_reason(message: types.Message, state: FSMContext):
     """Получаем причину отмены"""
     reason = message.text
     data = await state.get_data()
-    await db.update_reason_for_rejection_user(data['canceled_order_id'], reason)
-    admin_id = await db.get_seller_admin_tg_id(data['canceled_order_id'])
-    seller_inf = await db.get_seller_courier(data['canceled_order_id'])
-    logging.info(seller_inf)
-    try:
-        await bot.send_message(admin_id, f'{error_em} Заказ № {data["canceled_order_id"]} отклонен клиентом.\n'
-                                         f'Причина: {reason}')
-    except Exception as err:
-        logging.error(err)
-    if seller_inf['order_seller_id']:
+    if await db.can_cancel(data['canceled_order_id']):
+        await db.update_reason_for_rejection_user(data['canceled_order_id'], reason)
+        admin_id = await db.get_seller_admin_tg_id(data['canceled_order_id'])
+        seller_inf = await db.get_seller_courier(data['canceled_order_id'])
+        logging.info(seller_inf)
         try:
-            await bot.send_message(await db.get_seller_tg_id(seller_inf['order_seller_id']),
-                                   f'{error_em} Заказ № {data["canceled_order_id"]} отклонен клиентом.\n'
-                                   f'Причина: {reason}')
+            await bot.send_message(admin_id, f'{error_em} Заказ № {data["canceled_order_id"]} отклонен клиентом.\n'
+                                             f'Причина: {reason}')
         except Exception as err:
             logging.error(err)
-    if seller_inf['order_courier_id']:
-        try:
-            await bot.send_message(await db.get_courier_tg_id(seller_inf['order_courier_id']),
-                                   f'{error_em} Заказ № {data["canceled_order_id"]} отклонен клиентом.\n'
-                                   f'Причина: {reason}')
-        except Exception as err:
-            logging.error(err)
-    await message.answer(f'{success_em} Ваш заказ № {data["canceled_order_id"]} отменен')
+        if seller_inf['order_seller_id']:
+            try:
+                await bot.send_message(await db.get_seller_tg_id(seller_inf['order_seller_id']),
+                                       f'{error_em} Заказ № {data["canceled_order_id"]} отклонен клиентом.\n'
+                                       f'Причина: {reason}')
+            except Exception as err:
+                logging.error(err)
+        if seller_inf['order_courier_id']:
+            try:
+                await bot.send_message(await db.get_courier_tg_id(seller_inf['order_courier_id']),
+                                       f'{error_em} Заказ № {data["canceled_order_id"]} отклонен клиентом.\n'
+                                       f'Причина: {reason}')
+            except Exception as err:
+                logging.error(err)
+        await message.answer(f'{success_em} Ваш заказ № {data["canceled_order_id"]} отменен')
+
+    else:
+        await message.answer(f'{error_em} Извините, но на этой стадии заказ отменить нельзя')
     await state.finish()
 
 
@@ -509,7 +515,7 @@ async def get_review(call: CallbackQuery, callback_data: dict, state: FSMContext
         await call.message.answer('Спасибо. Мы уже сохранили Ваш отзыв к этому заказу.')
     else:
         await state.update_data(review_id=order_id)
-        await call.message.answer('Пожалуйста, напишете Ваш отзыв о заказе одним предложением.',
+        await call.message.answer('Пожалуйста, напишете Ваш отзыв о заказе одним сообщением.',
                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                       [
                                           InlineKeyboardButton(
@@ -536,5 +542,47 @@ async def get_review(message: types.Message, state: FSMContext):
     review = message.text
     data = await state.get_data()
     await db.update_review(data['review_id'], review)
+    await message.answer(f'{success_em} Спасибо за Ваш отзыв!')
+    await state.finish()
+
+
+@dp.callback_query_handler(reviev_bonus_order_data.filter())
+async def get_review(call: CallbackQuery, callback_data: dict, state: FSMContext):
+    """Просим написать отзыв"""
+    order_id = int(callback_data.get('order_id'))
+    if await db.bonus_order_has_review(order_id):
+        await call.message.answer('Спасибо. Мы уже сохранили Ваш отзыв к этому заказу.')
+    else:
+        await state.update_data(bonus_review_id=order_id)
+        await call.message.answer('Пожалуйста, напишете Ваш отзыв о заказе одним сообщением.',
+                                  reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                      [
+                                          InlineKeyboardButton(
+                                              text='Отмена',
+                                              callback_data='cancel_review'
+                                          )]
+                                  ]))
+    await Menu.WaitBonusReview.set()
+
+
+@dp.callback_query_handler(text='cancel_review', state=Menu.WaitBonusReview)
+async def cancel_review(call: CallbackQuery, state: FSMContext):
+    """Отмена отзыва"""
+    await call.message.edit_reply_markup()
+    await call.message.answer('Вы отменили написание отзыва.\n'
+                              'Вы в главном меню',
+                              reply_markup=menu_keyboard)
+    await state.finish()
+
+
+@dp.message_handler(state=Menu.WaitBonusReview)
+async def get_review(message: types.Message, state: FSMContext):
+    """Получаем отзыв"""
+    logging.info(await state.get_state())
+    review = message.text
+    logging.info(review)
+    data = await state.get_data()
+    logging.info(data)
+    await db.update_bonus_review(data['bonus_review_id'], review)
     await message.answer(f'{success_em} Спасибо за Ваш отзыв!')
     await state.finish()

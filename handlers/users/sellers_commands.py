@@ -4,7 +4,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from filters.users_filters import IsSellerMessage
 from keyboards.inline.callback_datas import confirm_order_seller_data, order_is_delivered, \
-    bonus_order_is_delivered_data, active_order_cancel_data
+    bonus_order_is_delivered_data, active_order_cancel_data, confirm_bonus_order, cancel_bonus_order_data_sellers
 from keyboards.inline.inline_keyboards import generate_active_order_keyboard, generate_active_bonus_order_keyboard
 from loader import dp, db
 from utils.check_states import states_for_menu, reset_state
@@ -153,39 +153,92 @@ async def confirm_delivery_seller(message: types.Message, state: FSMContext):
         await message.answer('Пока нет готовых к выдаче заказов.')
 
 
-@dp.message_handler(IsSellerMessage(), commands=['confirm_readiness_bonus_orders'], state=['*'])
+
+######### bonus_orders #######
+
+@dp.message_handler(IsSellerMessage(), commands=['unaccepted_bonus_orders'])
+async def get_unaccepted_bonus_orders(message: types.Message, state: FSMContext):
+    """Список непринятых бонусных заказов"""
+    """Показать список всех непринятых заказов"""
+    await reset_state(state, message)
+    location_id = await db.get_seller_location_id(message.from_user.id)
+    order_list = await db.get_unaccepted_bonus_orders_by_location_id(location_id)
+    if order_list:
+        for order in order_list:
+            mes = f"""Новый бонусный заказ № {order['bonus_order_id']}Б
+Количество бонусных роллов: {order['bonus_order_quantity']}
+Дата заказа: {order['bonus_order_date'].strftime("%d.%m.%Y")}
+Время заказа: {order['bonus_order_created_at'].strftime("%H:%M")}
+Пожалуйста, подойдите к кассе и, после выбора роллов клиентом, подтвердите заказ"""
+            await message.answer(mes,
+                                 reply_markup=InlineKeyboardMarkup(
+                                     inline_keyboard=[
+                                         [
+                                             InlineKeyboardButton(
+                                                 text=f'Подтвердить бонусный заказ № {order["bonus_order_id"]}Б',
+                                                 callback_data=confirm_bonus_order.new(
+                                                     b_order_id=order["bonus_order_id"])
+                                             )
+                                         ],
+                                         [
+                                             InlineKeyboardButton(
+                                                 text=f'Отклонить бонусный заказ № {order["bonus_order_id"]}Б',
+                                                 callback_data=cancel_bonus_order_data_sellers.new(
+                                                     b_order_id=order["bonus_order_id"],
+                                                     quantity=order['bonus_order_quantity']
+                                                 )
+                                             )
+                                         ]
+
+                                     ]
+                                 )
+                                 )
+    else:
+        await message.answer("Нет непринятых бонусных заказов заказов")
+
+
+@dp.message_handler(IsSellerMessage(), commands=['active_bonus_orders'], state=['*'])
 async def set_ready_bonus_orders(message: types.Message, state: FSMContext):
     """Получаем список ативных бонусных заказов"""
     await reset_state(state, message)
-    location_id = await db.get_seller_location_id(message.from_user.id)
-    order_list = await db.get_active_bonus_orders_by_location_id(location_id)
+    order_list = await db.get_active_bonus_orders_by_seller_id(message.from_user.id)
     if order_list:
+        await message.answer("Список принятых бонусных заказов:")
         for order in order_list:
-            await message.answer(text=f'Заказ № {order["bonus_order_id"]}Б\n'
-                                      f'Количество бонусных роллов - {order["bonus_quantity"]} шт.\n',
+            await message.answer(text=f'Бонусный заказ № {order["bonus_order_id"]}Б\n'
+                                      f'Количество бонусных роллов - {order["bonus_order_quantity"]} шт.\n',
                                  reply_markup=await generate_active_bonus_order_keyboard(order))
     else:
-        await message.answer('Пока нет бонусных заказов')
+        await message.answer('Пока нет принятых бонусных заказов')
 
 
-@dp.message_handler(IsSellerMessage(), commands=['confirm_bonus_orders'], state=['*'])
+@dp.message_handler(IsSellerMessage(), commands=['confirm_bonus_delivery'], state=['*'])
 async def bonus_orders_to_confirm_delivery(message: types.Message, state: FSMContext):
     """Список бонусных заказов к выдаче"""
     await reset_state(state, message)
-    location_id = await db.get_seller_location_id(message.from_user.id)
-    order_list = await db.get_ready_bonus_orders_by_location_id(location_id)
+    order_list = await db.get_ready_bonus_orders_by_seller_id(message.from_user.id)
     if order_list:
+        await message.answer("Список готовых к выдаче бонусных заказов:")
         for order in order_list:
             await message.answer(f'Бонусный заказ № {order["bonus_order_id"]}Б.\n'
-                                 f'Количество бонусных роллов - {order["bonus_quantity"]} шт.',
+                                 f'Количество бонусных роллов - {order["bonus_order_quantity"]} шт.',
                                  reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                      [
                                          InlineKeyboardButton(
-                                             text='Заказ выдан!',
+                                             text=f'Бонусный заказ № {order["bonus_order_id"]}Б выдан!',
                                              callback_data=bonus_order_is_delivered_data.new(
                                                  order_id=order["bonus_order_id"],
                                                  user_id=order[
-                                                     'bonus_order_user_telegram_id'])
+                                                     'user_telegram_id'])
+                                         )
+                                     ],
+                                     [
+                                         InlineKeyboardButton(
+                                             text=f'Отменить бонусный заказ № {order["bonus_order_id"]}Б',
+                                             callback_data=cancel_bonus_order_data_sellers.new(
+                                                 b_order_id=order["bonus_order_id"],
+                                                 quantity=order['bonus_order_quantity']
+                                             )
                                          )
                                      ]
                                  ]))

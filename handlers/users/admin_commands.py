@@ -106,6 +106,7 @@ async def take_orders(message: types.Message, state: FSMContext):
     if orders:
         await message.answer('Список непринятых или измененных заказов:')
         for order in orders:
+            logging.info(order)
             await message.answer(f'Заказ № {order["delivery_order_id"]}\n'
                                  f'{order["delivery_order_info"]}'
                                  f'Сумма заказа: {order["delivery_order_price"]} руб.\n'
@@ -229,7 +230,6 @@ async def add_delivery_item(message: types.Message, state: FSMContext):
         await AddAdmin.DeliveryItemCategory.set()
     else:
         await message.answer("Пока нет категорий. Чтобы добавить нажмите /add_delivery_category")
-
 
 
 @dp.message_handler(IsAdminMessage(), commands=['ban_user'], state=states_for_menu)
@@ -706,4 +706,3 @@ async def edit_item(message: types.Message, state: FSMContext):
     await message.answer('Выберите категорию, в которой находится товар.',
                          reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
     await AddAdmin.EditItem.set()
-

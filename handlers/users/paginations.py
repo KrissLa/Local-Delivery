@@ -9,11 +9,21 @@ from keyboards.inline.inline_keyboards import generate_key_board_with_admins, ge
     generate_keyboard_with_categories, generate_keyboard_with_products, get_available_local_objects_profile, \
     generate_keyboard_with_metro_for_seller_admin, generate_keyboard_with_metro, generate_keyboard_with_metro_profile, \
     generate_keyboard_with_delivery_categories_for_add_item
+from keyboards.inline.statistics_keyboards import gen_years_keyboard
 from loader import dp, db
 from states.admin_state import AddAdmin
 from states.menu_states import SignUpUser, Menu
 from states.profile_states import ProfileState
 from states.seller_admin_states import SellerAdmin
+
+
+@dp.callback_query_handler(page_call_data.filter(), state=[SellerAdmin.Year,
+                                                           SellerAdmin.Month])
+async def get_admin_pagination_list(call: CallbackQuery, callback_data: dict):
+    """Пагинация списка админов"""
+    page = int(callback_data.get('page'))
+    years = await db.get_orders_years()
+    await call.message.edit_reply_markup(await gen_years_keyboard(years, page))
 
 
 @dp.callback_query_handler(page_call_data.filter(), state=AddAdmin.WaitDeleteAdmins)
