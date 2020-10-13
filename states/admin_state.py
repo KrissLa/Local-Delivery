@@ -137,6 +137,7 @@ class AddAdmin(StatesGroup):
     DeliveryItemPrice = State()
 
     TakeOrders = State()
+    SetCourierOrders = State()
     ConfirmDeliveryOrders = State()
     TakeOrdersWait = State()
 
@@ -153,5 +154,9 @@ class AddAdmin(StatesGroup):
     EditDeliveryItem = State()
     EditDeliveryItemPrice = State()
     EditDeliveryItemID = State()
+
+    DeliveryCourierName = State()
+    DeliveryCourierID = State()
+    RemoveDeliveryCourier = State()
 
 

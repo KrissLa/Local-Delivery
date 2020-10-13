@@ -6,17 +6,18 @@ from aiogram.dispatcher import FSMContext
 from filters.users_filters import IsAdminMessage
 from keyboards.inline.inline_keyboards import generate_keyboard_with_delivery_categories_for_add_item, \
     cancel_admin_markup, gen_take_order_markup, gen_confirm_order_markup, generate_key_board_with_admins, \
-    generate_key_board_with_metro, generate_keyboard_with_categories_for_add_item
+    generate_key_board_with_metro, generate_keyboard_with_categories_for_add_item, generate_delivery_couriers_keyboard
 from loader import dp, db
 from states.admin_state import AddAdmin
 from utils.check_states import states_for_menu, reset_state
-from utils.emoji import attention_em_red, attention_em, error_em
+from utils.emoji import attention_em_red, attention_em, error_em, warning_em, blue_diamond_em
+from utils.product_list import get_delivery_product_list
 from utils.temp_orders_list import get_list_of_delivery_category, weekdays, get_list_of_location_message, \
     get_list_of_local_objects, get_list_of_category, get_list_of_seller_admins, get_list_of_sellers, \
     get_list_of_couriers, get_list_of_seller_admins_for_reset, get_list_of_sellers_for_reset, \
     get_list_of_couriers_for_reset, get_list_of_category_for_remove_from_stock, \
     get_list_of_category_for_return_to_stock, get_list_of_seller_admins_for_change, get_list_of_sellers_for_change, \
-    get_list_of_couriers_for_change
+    get_list_of_couriers_for_change, get_list_of_delivery_couriers
 
 
 @dp.message_handler(IsAdminMessage(), commands=['edit_delivery_item_price'], state=states_for_menu)
@@ -104,24 +105,130 @@ async def take_orders(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     orders = await db.get_unaccepted_delivery_orders()
     if orders:
-        await message.answer('Список непринятых или измененных заказов:')
+        await message.answer('Список непринятых заказов:')
         for order in orders:
             logging.info(order)
-            await message.answer(f'Заказ № {order["delivery_order_id"]}\n'
-                                 f'{order["delivery_order_info"]}'
-                                 f'Сумма заказа: {order["delivery_order_price"]} руб.\n'
-                                 f'telegramID пользователя - {order["delivery_order_user_telegram_id"]}\n'
+            await message.answer(f'{blue_diamond_em} Заказ № {order["delivery_order_id"]}\n'
+                                 f'{await get_delivery_product_list(order["delivery_order_id"])}'
+                                 f'Сумма заказа: {order["delivery_order_final_price"]} руб.\n'
+                                 f'id заказчика - {order["delivery_order_seller_admin_id"]}\n'
                                  f'Адрес доставки: {order["location_name"]}\n'
                                  f'{order["location_address"]}\n'
                                  f'Время создания {order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
-                                 f'Дата доставки: {order["day_for_delivery"].strftime("%d.%m.%Y")} '
-                                 f'{weekdays[order["day_for_delivery"].weekday()]}\n'
-                                 f'Время доставки: {order["delivery_time_info"]}\n'
+                                 f'Дата доставки: {order["delivery_order_day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order["delivery_order_day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order["delivery_order_time_info"]}\n'
                                  f'Статус заказа: {order["delivery_order_status"]}\n'
                                  f'{attention_em} Чтобы принять или отклонить нажмите '
                                  f'/take_order_{order["delivery_order_id"]}')
     else:
-        await message.answer('Нет непринятых или измененных заказов.')
+        await message.answer('Нет непринятых заказов.')
+
+
+@dp.message_handler(IsAdminMessage(), commands=['delivery_order_set_courier'], state='*')
+async def set_courier(message: types.Message, state: FSMContext):
+    """Список заказов в которые нужно назначить курьера"""
+    await reset_state(state, message)
+    orders = await db.get_delivery_orders_for_couriers(message.from_user.id)
+    if orders:
+        await message.answer('Список заказов, в которых не назначен курьер:')
+        for order in orders:
+            await message.answer(f'{blue_diamond_em} Заказ № {order["delivery_order_id"]}\n'
+                                 f'{await get_delivery_product_list(order["delivery_order_id"])}'
+                                 f'Сумма заказа: {order["delivery_order_final_price"]} руб.\n'
+                                 f'id заказчика - {order["delivery_order_seller_admin_id"]}\n'
+                                 f'Адрес доставки: {order["location_name"]}\n'
+                                 f'{order["location_address"]}\n'
+                                 f'Время создания {order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                 f'Дата доставки: {order["delivery_order_day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order["delivery_order_day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order["delivery_order_time_info"]}\n'
+                                 f'Статус заказа: {order["delivery_order_status"]}\n'
+                                 f'{attention_em} Чтобы назначить курьера нажмите '
+                                 f'/delivery_order_set_courier_{order["delivery_order_id"]}')
+    else:
+        await message.answer('Нет заказов, в которых не назначен курьер.')
+
+
+@dp.message_handler(IsAdminMessage(), commands=['delivery_orders_awaiting_delivery'], state='*')
+async def set_courier(message: types.Message, state: FSMContext):
+    """Список заказов в которые нужно назначить курьера"""
+    await reset_state(state, message)
+    orders = await db.get_delivery_orders_awaiting_delivery(message.from_user.id)
+    if orders:
+        await message.answer('Список заказов, которые ожидают доставки:')
+        for order in orders:
+            await message.answer(f'{blue_diamond_em} Заказ № {order["delivery_order_id"]}\n'
+                                 f'{await get_delivery_product_list(order["delivery_order_id"])}'
+                                 f'Сумма заказа: {order["delivery_order_final_price"]} руб.\n'
+                                 f'id заказчика - {order["delivery_order_seller_admin_id"]}\n'
+                                 f'Курьер - {order["delivery_courier_name"]}'
+                                 f'Адрес доставки: {order["location_name"]}\n'
+                                 f'{order["location_address"]}\n'
+                                 f'Время создания {order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                 f'Дата доставки: {order["delivery_order_day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order["delivery_order_day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order["delivery_order_time_info"]}\n'
+                                 f'Статус заказа: {order["delivery_order_status"]}\n')
+    else:
+        await message.answer('Нет заказов, которые ожидают доставки.')
+
+
+@dp.message_handler(IsAdminMessage(), commands=['delivery_orders_awaiting_courier'], state='*')
+async def set_courier(message: types.Message, state: FSMContext):
+    """Список заказов в которые нужно назначить курьера"""
+    await reset_state(state, message)
+    orders = await db.get_delivery_orders_awaiting_courier(message.from_user.id)
+    if orders:
+        await message.answer('Список заказов, которые ожидают подтверждения от курьера:')
+        for order in orders:
+            await message.answer(f'{blue_diamond_em} Заказ № {order["delivery_order_id"]}\n'
+                                 f'{await get_delivery_product_list(order["delivery_order_id"])}'
+                                 f'Сумма заказа: {order["delivery_order_final_price"]} руб.\n'
+                                 f'id заказчика - {order["delivery_order_seller_admin_id"]}\n'
+                                 f'Адрес доставки: {order["location_name"]}\n'
+                                 f'{order["location_address"]}\n'
+                                 f'Время создания {order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                 f'Дата доставки: {order["delivery_order_day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order["delivery_order_day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order["delivery_order_time_info"]}\n'
+                                 f'Статус заказа: {order["delivery_order_status"]}\n')
+    else:
+        await message.answer('Нет заказов, которые ожидают подтверждения курьера.')
+
+
+@dp.message_handler(IsAdminMessage(), regexp="delivery_order_set_courier_\d+", state='*')
+async def set_courier(message: types.Message, state: FSMContext):
+    """set courier"""
+    await reset_state(state, message)
+    try:
+        order_id = int(message.text.split('_')[-1])
+        delivery = await db.get_delivery_admin_id(order_id)
+        admin_id = await db.get_admin_id(message.from_user.id)
+        if delivery['delivery_order_admin_id'] == admin_id and delivery['delivery_order_courier_id'] is None:
+            couriers = await db.get_delivery_couriers()
+            if couriers:
+                order_data = await db.get_delivery_order_data(order_id)
+                await message.answer(f'Заказ № {order_data["delivery_order_id"]}\n'
+                                     f'{await get_delivery_product_list(order_data["delivery_order_id"])}'
+                                     f'Сумма заказа: {order_data["delivery_order_final_price"]} руб.\n'
+                                     f'id заказчика - {order_data["delivery_order_seller_admin_id"]}\n'
+                                     f'Адрес доставки: {order_data["location_name"]}\n'
+                                     f'{order_data["location_address"]}\n'
+                                     f'Время создания {order_data["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
+                                     f'Дата доставки: {order_data["delivery_order_day_for_delivery"].strftime("%d.%m.%Y")} '
+                                     f'{weekdays[order_data["delivery_order_day_for_delivery"].weekday()]}\n'
+                                     f'Время доставки: {order_data["delivery_order_time_info"]}\n'
+                                     f'Статус заказа: {order_data["delivery_order_status"]}\n'
+                                     f'{warning_em} Выберите курьера.',
+                                     reply_markup=await generate_delivery_couriers_keyboard(couriers, order_id))
+                await AddAdmin.SetCourierOrders.set()
+        else:
+            await message.answer(
+                f'Нет заказ с номером № {order_id}, за который отвечаете Вы и в котором не назначен курьер')
+    except Exception as err:
+        logging.info(err)
+        await message.answer('Неизвестная команда')
 
 
 @dp.message_handler(IsAdminMessage(), regexp="take_order_\d+", state=states_for_menu)
@@ -134,15 +241,15 @@ async def take_order__by_id(message: types.Message, state: FSMContext):
         if order_id in await db.get_unaccepted_delivery_orders_ids():
             order_data = await db.get_delivery_order_data(order_id)
             await message.answer(f'Заказ № {order_data["delivery_order_id"]}\n'
-                                 f'{order_data["delivery_order_info"]}'
-                                 f'Сумма заказа: {order_data["delivery_order_price"]} руб.\n'
-                                 f'telegramID пользователя - {order_data["delivery_order_user_telegram_id"]}\n'
+                                 f'{await get_delivery_product_list(order_data["delivery_order_id"])}'
+                                 f'Сумма заказа: {order_data["delivery_order_final_price"]} руб.\n'
+                                 f'id заказчика - {order_data["delivery_order_seller_admin_id"]}\n'
                                  f'Адрес доставки: {order_data["location_name"]}\n'
                                  f'{order_data["location_address"]}\n'
                                  f'Время создания {order_data["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
-                                 f'Дата доставки: {order_data["day_for_delivery"].strftime("%d.%m.%Y")} '
-                                 f'{weekdays[order_data["day_for_delivery"].weekday()]}\n'
-                                 f'Время доставки: {order_data["delivery_time_info"]}\n'
+                                 f'Дата доставки: {order_data["delivery_order_day_for_delivery"].strftime("%d.%m.%Y")} '
+                                 f'{weekdays[order_data["delivery_order_day_for_delivery"].weekday()]}\n'
+                                 f'Время доставки: {order_data["delivery_order_time_info"]}\n'
                                  f'Статус заказа: {order_data["delivery_order_status"]}\n',
                                  reply_markup=await gen_take_order_markup(order_data["delivery_order_id"]))
             await AddAdmin.TakeOrders.set()
@@ -153,59 +260,7 @@ async def take_order__by_id(message: types.Message, state: FSMContext):
         await message.answer('Неизвестная команда')
 
 
-@dp.message_handler(IsAdminMessage(), commands=['confirm_delivery'], state=states_for_menu)
-@dp.message_handler(IsAdminMessage(), commands=['confirm_delivery'])
-async def take_orders(message: types.Message, state: FSMContext):
-    """Список непринятых или измененных заказов"""
-    await reset_state(state, message)
-    orders = await db.get_accepted_delivery_orders()
-    if orders:
-        await message.answer('Список заказов, ожидающих доставки:')
-        for order in orders:
-            await message.answer(f'Заказ № {order["delivery_order_id"]}\n'
-                                 f'{order["delivery_order_info"]}'
-                                 f'Сумма заказа: {order["delivery_order_price"]} руб.\n'
-                                 f'telegramID пользователя - {order["delivery_order_user_telegram_id"]}\n'
-                                 f'Адрес доставки: {order["location_name"]}\n'
-                                 f'{order["location_address"]}\n'
-                                 f'Время создания {order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
-                                 f'Дата доставки: {order["day_for_delivery"].strftime("%d.%m.%Y")} '
-                                 f'{weekdays[order["day_for_delivery"].weekday()]}\n'
-                                 f'Время доставки: {order["delivery_time_info"]}\n'
-                                 f'Статус заказа: {order["delivery_order_status"]}\n'
-                                 f'{attention_em} Чтобы подтвердить доставку или отклонить нажмите '
-                                 f'/confirm_delivery_{order["delivery_order_id"]}')
-    else:
-        await message.answer('Нет заказов, ожидающих доставки.')
 
-
-@dp.message_handler(IsAdminMessage(), regexp="confirm_delivery_\d+", state=states_for_menu)
-@dp.message_handler(IsAdminMessage(), regexp="confirm_delivery_\d+", state='*')
-async def confirm_delivery_by_id(message: types.Message, state: FSMContext):
-    """Подтверждаем доставку"""
-    await reset_state(state, message)
-    try:
-        order_id = int(message.text.split('_')[-1])
-        if order_id in await db.get_accepted_delivery_orders_ids():
-            order_data = await db.get_delivery_order_data(order_id)
-            await message.answer(f'Заказ № {order_data["delivery_order_id"]}\n'
-                                 f'{order_data["delivery_order_info"]}'
-                                 f'Сумма заказа: {order_data["delivery_order_price"]} руб.\n'
-                                 f'telegramID пользователя - {order_data["delivery_order_user_telegram_id"]}\n'
-                                 f'Адрес доставки: {order_data["location_name"]}\n'
-                                 f'{order_data["location_address"]}\n'
-                                 f'Время создания {order_data["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
-                                 f'Дата доставки: {order_data["day_for_delivery"].strftime("%d.%m.%Y")} '
-                                 f'{weekdays[order_data["day_for_delivery"].weekday()]}\n'
-                                 f'Время доставки: {order_data["delivery_time_info"]}\n'
-                                 f'Статус заказа: {order_data["delivery_order_status"]}\n',
-                                 reply_markup=await gen_confirm_order_markup(order_data["delivery_order_id"]))
-            await AddAdmin.ConfirmDeliveryOrders.set()
-        else:
-            await message.answer(f'Нет принятого и не доставленного заказа с номером № {order_id}')
-    except Exception as err:
-        logging.info(err)
-        await message.answer('Неизвестная команда')
 
 
 @dp.message_handler(IsAdminMessage(), commands=['add_delivery_category'], state=states_for_menu)
@@ -511,6 +566,34 @@ async def remove_courier(message: types.Message, state: FSMContext):
                              reply_markup=cancel_admin_markup)
 
     await AddAdmin.RemoveCourier.set()
+
+
+@dp.message_handler(IsAdminMessage(), commands=['add_delivery_courier'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['add_delivery_courier'])
+async def add_courier(message: types.Message, state: FSMContext):
+    """Добавляем курьера"""
+    await reset_state(state, message)
+    await message.answer('Пожалуйста, введите имя курьера',
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.DeliveryCourierName.set()
+
+
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_courier'], state=states_for_menu)
+@dp.message_handler(IsAdminMessage(), commands=['remove_delivery_courier'])
+async def remove_courier(message: types.Message, state: FSMContext):
+    """Удаляем курьера"""
+    await reset_state(state, message)
+    await message.answer(f'{attention_em_red} Удаление происходит сразу после нажатия на команду\n')
+    couriers_list = await db.get_delivery_courier_list()
+    if couriers_list:
+        list_message = await get_list_of_delivery_couriers(couriers_list)
+        await message.answer(list_message,
+                             reply_markup=cancel_admin_markup)
+    else:
+        await message.answer('Пока нет курьеров.',
+                             reply_markup=cancel_admin_markup)
+
+    await AddAdmin.RemoveDeliveryCourier.set()
 
 
 @dp.message_handler(IsAdminMessage(), commands=['reset_seller_admin_location'], state=states_for_menu)

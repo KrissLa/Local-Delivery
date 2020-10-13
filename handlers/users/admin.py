@@ -86,8 +86,6 @@ async def get_price(message: types.Message, state: FSMContext):
                              reply_markup=cancel_admin_markup)
 
 
-
-
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.ReturnDeliveryItemToStockCategory)
 async def get_category_for_return_item_to_stock(call: CallbackQuery, callback_data: dict):
     """Получаем категорию, в которую будем возвращать товар"""
@@ -119,8 +117,6 @@ async def return_item_to_stock_by_id(message: types.Message, state: FSMContext):
         logging.error(err)
         await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
-
-
 
 
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.RemoveDeliveryItemFromStockCategory)
@@ -194,8 +190,6 @@ async def remove_item_by_id(message: types.Message, state: FSMContext):
 #######################
 
 
-
-
 @dp.message_handler(IsAdminMessage(), regexp="remove_delivery_category_by_id_\d+",
                     state=AddAdmin.RemoveDeliveryCategory)
 async def remove_category_by_id(message: types.Message, state: FSMContext):
@@ -212,112 +206,12 @@ async def remove_category_by_id(message: types.Message, state: FSMContext):
                              reply_markup=cancel_admin_markup)
 
 
-
-@dp.callback_query_handler(text='back', state=AddAdmin.TakeOrdersWait)
-async def back(call: CallbackQuery, state: FSMContext):
-    """Назад"""
-    await call.message.edit_reply_markup()
-    data = await state.get_data()
-    order_id = data.get('order_id')
-    if order_id in await db.get_unaccepted_delivery_orders_ids():
-        order_data = await db.get_delivery_order_data(order_id)
-        await call.message.answer(f'Заказ № {order_data["delivery_order_id"]}\n'
-                                  f'{order_data["delivery_order_info"]}'
-                                  f'Сумма заказа: {order_data["delivery_order_price"]} руб.\n'
-                                  f'telegramID пользователя - {order_data["delivery_order_user_telegram_id"]}\n'
-                                  f'Адрес доставки: {order_data["location_name"]}\n'
-                                  f'{order_data["location_address"]}\n'
-                                  f'Время создания {order_data["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}\n'
-                                  f'Дата доставки: {order_data["day_for_delivery"].strftime("%d.%m.%Y")} '
-                                  f'{weekdays[order_data["day_for_delivery"].weekday()]}\n'
-                                  f'Время доставки: {order_data["delivery_time_info"]}\n'
-                                  f'Статус заказа: {order_data["delivery_order_status"]}\n',
-                                  reply_markup=await gen_take_order_markup(order_data["delivery_order_id"]))
-        await AddAdmin.TakeOrders.set()
-    else:
-        await call.message.answer(f'Нет непринятого или измененного заказ с номером № {order_id}')
-
-
-@dp.callback_query_handler(take_delivery_order.filter(), state=AddAdmin.TakeOrders)
-async def take_order_confirm(call: CallbackQuery, state: FSMContext, callback_data: dict):
-    """Принять заказ"""
-    await call.message.edit_reply_markup()
-    order_id = int(callback_data.get('order_id'))
-    status = await db.get_delivery_order_status(order_id)
-    if status == 'Ожидание подтверждения':
-        await db.update_delivery_order_status(order_id, 'Заказ подтвержден')
-    elif status == 'Заказ изменен':
-        await db.update_delivery_order_status(order_id, 'Заказ подтвержден после изменения')
-    else:
-        await call.message.answer(f'{error_em} Что-то пошло не так!')
-        await state.finish()
-        return
-    await call.message.answer(f'{success_em} Заказ № {order_id} принят.\n'
-                              f'{warning_em} Подтвердить доставку - /confirm_delivery_{order_id}\n'
-                              f'{attention_em} Посмотреть список заказов, которые нужно доставить - '
-                              f'/confirm_delivery')
-    await state.finish()
-
-
-@dp.callback_query_handler(dont_take_delivery_order.filter(), state=[AddAdmin.TakeOrders,
-                                                                     AddAdmin.ConfirmDeliveryOrders])
-async def take_order_cancel(call: CallbackQuery, callback_data: dict, state: FSMContext):
-    """Отклонить заказ заказ"""
-    await call.message.edit_reply_markup()
-    order_id = int(callback_data.get('order_id'))
-    await state.update_data(order_id=order_id)
-    await call.message.answer("Вы уверены что хотите отклонить заказ?",
-                              reply_markup=confirm_cancel_delivery)
-    await AddAdmin.TakeOrdersWait.set()
-
-
-@dp.callback_query_handler(text='confirm_cancel_delivery', state=AddAdmin.TakeOrdersWait)
-async def cancel_order(call: CallbackQuery, state: FSMContext):
-    """Отменяем заказ"""
-    await call.message.edit_reply_markup()
-    data = await state.get_data()
-    order_id = data.get('order_id')
-    order_owner = await db.get_delivery_order_owner(order_id)
-    await db.update_delivery_order_status(order_id, 'Отменен')
-    try:
-        await bot.send_message(order_owner, f'{error_em} Ваш заказ на поставку продуктов № {order_id} отменен.')
-        await call.message.answer(f'{success_em} Заказ № {order_id} отменен.\n')
-    except Exception as err:
-        logging.error(err)
-        await call.message.answer(f'{success_em} Заказ № {order_id} отменен.\n'
-                                  f'{error_em} Не удалось отправить уведомление об отмене админу локации.')
-
-    await state.finish()
-
-
-
-
-@dp.callback_query_handler(confirm_delivery_order.filter(), state=AddAdmin.ConfirmDeliveryOrders)
-async def confirm_delivery_orderr(call: CallbackQuery, callback_data: dict, state: FSMContext):
-    """Подтверждаем доставку заказа"""
-    await call.message.edit_reply_markup()
-    order_id = int(callback_data.get('order_id'))
-    await db.update_delivery_order_status(order_id, 'Заказ доставлен')
-    order_owner = await db.get_delivery_order_owner(order_id)
-    try:
-        await bot.send_message(order_owner, f'{success_em} Ваш заказ на поставку продуктов № {order_id} доставлен.')
-        await call.message.answer(f'{success_em} Заказ № {order_id} доставлен.\n')
-    except Exception as err:
-        logging.error(err)
-        await call.message.answer(f'{success_em} Заказ № {order_id} доставлен.\n'
-                                  f'{error_em} Не удалось отправить уведомление о доставке админу локации.')
-    await state.finish()
-
-
-
 @dp.message_handler(state=AddAdmin.DeliveryCategoryName)
 async def get_delivery_category_name(message: types.Message, state: FSMContext):
     await db.add_delivery_category(message.text)
     await message.answer(f'{success_em} Новая категория для оптовых поставок добавлена!\n'
                          f'"{message.text}"')
     await state.finish()
-
-
 
 
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.DeliveryItemCategory)
@@ -375,7 +269,6 @@ async def get_delivery_order_price(message: types.Message, state: FSMContext):
                              f'Пример: \n'
                              f'1650',
                              reply_markup=cancel_admin_markup)
-
 
 
 @dp.message_handler(state=AddAdmin.BanID)
@@ -1415,6 +1308,52 @@ async def get_courier_id(message: types.Message, state: FSMContext):
     await AddAdmin.CourierMetro.set()
 
 
+@dp.message_handler(state=AddAdmin.DeliveryCourierName)
+async def get_courier_name(message: types.Message, state: FSMContext):
+    """Получаем имя курьера"""
+    name = message.text
+    await state.update_data(name=name)
+    await message.answer(f"Отлично!\n"
+                         f"Имя курьера - {name}\n"
+                         f"Теперь введите telegramID курьера. \n"
+                         f"{attention_em} Взять id сотрудник может в этом боте @myidbot\n"
+                         f"{attention_em_red} Пользователю будет отправлено сообщение о назначении должности. "
+                         f"Поэтому он должен отправить боту хотя бы одно сообщение перед назначением.",
+                         reply_markup=cancel_admin_markup)
+    await AddAdmin.DeliveryCourierID.set()
+
+
+@dp.message_handler(state=AddAdmin.DeliveryCourierID)
+async def get_courier_id(message: types.Message, state: FSMContext):
+    """Получаем id курьера"""
+    try:
+        new_id = int(message.text)
+        data = await state.get_data()
+        name = data.get('name')
+        try:
+            await bot.send_message(new_id,
+                                   'Вам назначена должность Курьер оптовых заказов')
+            if await db.add_delivery_courier(new_id, name):
+
+                await message.answer(f"{success_em} Отлично!\n"
+                                     f"Имя курьера - {name}\n"
+                                     f"TelegramID - {new_id}\n\n"
+                                     'Курьер добавлен!')
+            else:
+                await message.answer(f"{error_em} Не получилось добавить курьера. Скорее всего, курьер с таким "
+                                     f"TelegramID уже добавлен")
+            await state.finish()
+        except Exception as err:
+            logging.error(err)
+            await message.answer(f"{error_em} Не получилось добавить курьера. Скорее всего, он не отправил "
+                                 f"сообщение боту. Попробуйте сначала.")
+            await state.finish()
+    except Exception as err:
+        logging.error(err)
+        await message.answer('Вам нужно ввести id сотрудника.',
+                             reply_markup=cancel_admin_markup)
+
+
 @dp.callback_query_handler(state=AddAdmin.CourierMetro, text='seller_admin_later')
 async def add_courier_without_location(call: CallbackQuery, state: FSMContext):
     """Добавляем курьера без привязки к локации"""
@@ -1488,6 +1427,21 @@ async def remove_courier_by_id(message: types.Message, state: FSMContext):
         await db.delete_courier_by_id(courier_id)
         await message.answer('Курьер удален. \n'
                              f'{attention_em} Чтобы удалить еще одного снова введите /remove_courier')
+        await state.finish()
+    except Exception as err:
+        logging.error(err)
+        await message.answer(f'{error_em} Неизвестная команда',
+                             reply_markup=cancel_admin_markup)
+
+
+@dp.message_handler(IsAdminMessage(), regexp="remove_delivery_courier_by_id_\d+", state=AddAdmin.RemoveDeliveryCourier)
+async def remove_courier_by_id(message: types.Message, state: FSMContext):
+    """Удаляем курьера"""
+    try:
+        courier_id = int(message.text.split('_')[-1])
+        await db.delete_delivery_courier_by_id(courier_id)
+        await message.answer('Курьер удален. \n'
+                             f'{attention_em} Чтобы удалить еще одного снова введите /remove_delivery_courier')
         await state.finish()
     except Exception as err:
         logging.error(err)
@@ -2778,7 +2732,10 @@ async def back_to_edit(call: CallbackQuery, state: FSMContext):
                                                  AddAdmin.ReturnDeliveryItemToStockProduct,
                                                  AddAdmin.EditDeliveryItem,
                                                  AddAdmin.EditDeliveryItemID,
-                                                 AddAdmin.EditDeliveryItemPrice])
+                                                 AddAdmin.EditDeliveryItemPrice,
+                                                 AddAdmin.DeliveryCourierID,
+                                                 AddAdmin.DeliveryCourierName,
+                                                 AddAdmin.RemoveDeliveryCourier])
 async def cancel_add_admin(call: CallbackQuery, state: FSMContext):
     """Кнопка отмены"""
     await call.message.edit_reply_markup()

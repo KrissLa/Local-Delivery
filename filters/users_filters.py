@@ -48,6 +48,12 @@ class IsCourierMessage(BoundFilter):
         return await db.is_courier(message.from_user.id)
 
 
+class IsDeliveryCourierMessage(BoundFilter):
+    async def check(self, message: types.Message):
+        """Проверка на курьера в сообщении"""
+        return await db.is_delivery_courier(message.from_user.id)
+
+
 class IsCourierCallback(BoundFilter):
     async def check(self, call: types.CallbackQuery):
         """Проверка на курьера в коллбеках"""

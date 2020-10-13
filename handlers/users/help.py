@@ -2,7 +2,8 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import CommandHelp
 
-from filters.users_filters import IsAdminMessage, IsSellerAdminMessage, IsSellerMessage, IsCourierMessage
+from filters.users_filters import IsAdminMessage, IsSellerAdminMessage, IsSellerMessage, IsCourierMessage, \
+    IsDeliveryCourierMessage
 from loader import dp
 from utils.check_states import states_for_menu, reset_state
 from utils.misc import rate_limit
@@ -33,56 +34,56 @@ async def bot_help(message: types.Message, state: FSMContext):
         '10. Добавить админа локации - /add_seller_admin',
         '11. Добавить продавца - /add_seller',
         '12. Добавить курьера - /add_courier',
+        '13. Добавить курьера оптовых заказов - /add_delivery_courier',
         '   Удаление:',
-        '13. Удалить админа - /delete_admin',
-        '14. Удалить админа локации - /remove_seller_admin',
-        '15. Удалить продавца - /remove_seller',
-        '16. Удалить курьера - /remove_courier',
+        '14. Удалить админа - /delete_admin',
+        '15. Удалить админа локации - /remove_seller_admin',
+        '16. Удалить продавца - /remove_seller',
+        '17. Удалить курьера - /remove_courier',
+        '18. Удалить курьера оптовых заказов - /remove_delivery_courier',
         '   Локации персонала:',
-        '17. Открепить админа локации от локации - /reset_seller_admin_location',
-        '18. Открепить продавца от локации - /reset_seller_location',
-        '19. Открепить курьера от локации - /reset_courier_location',
-        '20. Привязать админа локации к другой локации - /change_seller_admin_location',
-        '21. Привязать продавца к другой локации - /change_seller_location',
-        '22. Привязать курьера к другой локации - /change_courier_location\n',
+        '19. Открепить админа локации от локации - /reset_seller_admin_location',
+        '20. Открепить продавца от локации - /reset_seller_location',
+        '21. Открепить курьера от локации - /reset_courier_location',
+        '22. Привязать админа локации к другой локации - /change_seller_admin_location',
+        '23. Привязать продавца к другой локации - /change_seller_location',
+        '24. Привязать курьера к другой локации - /change_courier_location\n',
         'Работа с локациями:',
-        '23. Добавить станцию метро - /add_metro',
-        '24. Добавить точку продаж - /add_newlocation',
-        '25. Добавить объект локальной доставки - /add_local_object',
-        '26. Удалить станцию метро - /delete_metro',
-        '27. Удалить точку продаж - /delete_location',
-        '28. Удалить объект локальной доставки - /remove_local_object',
-        '29. Редактировать метро - /edit_metro\n',
+        '25. Добавить станцию метро - /add_metro',
+        '26. Добавить точку продаж - /add_newlocation',
+        '27. Добавить объект локальной доставки - /add_local_object',
+        '28. Удалить станцию метро - /delete_metro',
+        '29. Удалить точку продаж - /delete_location',
+        '30. Удалить объект локальной доставки - /remove_local_object',
+        '31. Редактировать метро - /edit_metro\n',
         'Работа с категориями:',
-        '30. Добавить категорию товара - /add_category',
-        '31. Удалить категорию товара - /remove_category',
-        '32. Убрать категорию из меню - /remove_category_from_stock',
-        '33. Вернуть категорию в меню - /return_category_to_stock\n',
+        '32. Добавить категорию товара - /add_category',
+        '33. Удалить категорию товара - /remove_category',
+        '34. Убрать категорию из меню - /remove_category_from_stock',
+        '35. Вернуть категорию в меню - /return_category_to_stock\n',
         'Работа с товарами:',
-        '34. Добавить товар - /add_item',
-        '35. Удалить товар - /remove_item',
-        '36. Убрать товар из меню - /remove_item_from_stock',
-        '37. Вернуть товар в меню - /return_item_to_stock',
-        '38. Редактировать товар - /edit_item\n',
+        '36. Добавить товар - /add_item',
+        '37. Удалить товар - /remove_item',
+        '38. Убрать товар из меню - /remove_item_from_stock',
+        '39. Вернуть товар в меню - /return_item_to_stock',
+        '40. Редактировать товар - /edit_item\n',
         'Работа с пользователями:',
-        '39. Заблокировать пользователя - /ban_user',
-        '40. Разблокировать пользователя - /unban_user\n',
+        '41. Заблокировать пользователя - /ban_user',
+        '42. Разблокировать пользователя - /unban_user\n',
         'Работа с оптовыми товарами:',
-        '41. Добавить новую категорию для оптовых поставок - /add_delivery_category',
-        '42. Добавить новый товар для оптовых поставок - /add_delivery_item',
-        '43. Изменить цену товара для оптовых поставок - /edit_delivery_item_price\n',
-        '44. Удалить категорию для оптовых поставок - /remove_delivery_category',
-        '45. Удалить товар для оптовых поставок - /remove_delivery_item\n',
-        '46. Убрать товар для оптовых поставок из меню - /remove_delivery_item_from_stock',
-        '47. Вернуть товар для оптовых поставок в меню - /return_delivery_item_to_stock\n',
+        '43. Добавить новую категорию для оптовых поставок - /add_delivery_category',
+        '44. Добавить новый товар для оптовых поставок - /add_delivery_item',
+        '45. Изменить цену товара для оптовых поставок - /edit_delivery_item_price\n',
+        '46. Удалить категорию для оптовых поставок - /remove_delivery_category',
+        '47. Удалить товар для оптовых поставок - /remove_delivery_item\n',
+        '48. Убрать товар для оптовых поставок из меню - /remove_delivery_item_from_stock',
+        '49. Вернуть товар для оптовых поставок в меню - /return_delivery_item_to_stock\n',
 
         'Работа с оптовыми заказами:',
-        '48. Принять новые или измененные заказы - /take_orders',
-        '49. Подтвердить доставку заказа - /confirm_delivery',
-
-
-
-
+        '50. Принять новые заказы - /take_orders',
+        '51. Заказы, в которых не назначен курьер (Выбрать курьера для доставки заказа) - /delivery_order_set_courier',
+        '52. Список заказов, ожидающих подтверждения курьером - /delivery_orders_awaiting_courier',
+        '53. Список заказов, ожидающих доставки - /delivery_orders_awaiting_delivery',
     ]
     await message.answer('\n'.join(text))
 
@@ -146,6 +147,29 @@ async def bot_help(message: types.Message, state: FSMContext):
 
 
 @rate_limit(5, 'help')
+@dp.message_handler(CommandHelp(), IsDeliveryCourierMessage(), state=states_for_menu)
+@dp.message_handler(CommandHelp(), IsDeliveryCourierMessage(), state='*')
+async def bot_help(message: types.Message, state: FSMContext):
+    await reset_state(state, message)
+    text = [
+        'Общие команды: ',
+        '0. Если бот завис и не реагирует на Ваши сообщения - /restart',
+        '1. Получить справку - /help',
+        '2. Корзина - /cart',
+        '3. Показать меню - /menu',
+        '4. Показать статус заказа - /order_status',
+        '5. Показать статус бонусного заказа - /bonus_order_status\n',
+        'Команды курьера:',
+        '6. Начать принимать заказы - /im_at_work_dc',
+        '7. Прекратить принимать заказы - /im_at_home_dc',
+        '8. Список новых или измененных заказов, ожидающих подтверждения - /unaccepted_delivery_orders',
+        '9. Список подтвержденных заказов, ожидающих доставки - /confirm_delivery_order',
+
+    ]
+    await message.answer('\n'.join(text))
+
+
+@rate_limit(5, 'help')
 @dp.message_handler(CommandHelp(), IsCourierMessage(), state=states_for_menu)
 @dp.message_handler(CommandHelp(), IsCourierMessage(), state='*')
 async def bot_help(message: types.Message, state: FSMContext):
@@ -159,8 +183,8 @@ async def bot_help(message: types.Message, state: FSMContext):
         '4. Показать статус заказа - /order_status',
         '5. Показать статус бонусного заказа - /bonus_order_status\n',
         'Команды курьера:',
-        '6. Начать принимать заказы - /im_at_work',
-        '7. Прекратить принимать заказы - /im_at_home',
+        '6. Начать принимать заказы - /im_at_work_c',
+        '7. Прекратить принимать заказы - /im_at_home_c',
         '8. Список заказов, готовых для доставки - /all_ready_orders',
         '9. Список заказов, закрепленных за Вами - /my_orders',
 

@@ -10,7 +10,7 @@ from utils.emoji import success_em, error_em, grey_exclamation_em, blue_diamond_
 from utils.product_list import get_product_list
 
 
-@dp.message_handler(IsCourierMessage(), commands=['im_at_work'], state=['*'])
+@dp.message_handler(IsCourierMessage(), commands=['im_at_work_c'], state=['*'])
 async def im_at_work(message: types.Message, state: FSMContext):
     """Ставим статус на работе"""
     await reset_state(state, message)
@@ -18,7 +18,7 @@ async def im_at_work(message: types.Message, state: FSMContext):
     await message.answer(f'{success_em} Теперь Вы будете получать заказы')
 
 
-@dp.message_handler(IsCourierMessage(), commands=['im_at_home'], state=['*'])
+@dp.message_handler(IsCourierMessage(), commands=['im_at_home_c'], state=['*'])
 async def im_at_home(message: types.Message, state: FSMContext):
     """Ставим статус дома"""
     await reset_state(state, message)

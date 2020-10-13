@@ -4,10 +4,11 @@ from loader import db
 from pytz import timezone
 from datetime import datetime, timedelta
 
-from utils.emoji import attention_em, warning_em
-
+from utils.emoji import attention_em, warning_em, blue_diamond_em
+from utils.product_list import get_delivery_product_list
 
 weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+
 
 async def get_temp_orders_list_message(orders):
     """Формируем список покупок за сеанс"""
@@ -360,6 +361,18 @@ telegramID - {cour['courier_telegram_id']}
     return mes
 
 
+async def get_list_of_delivery_couriers(couriers_list):
+    """Формируем список курьеров для удаления"""
+    mes = ''
+
+    for cour in couriers_list:
+        seller = f"""{cour['delivery_courier_id']}. {cour['delivery_courier_name']}
+telegramID - {cour['delivery_courier_telegram_id']}
+Чтобы удалить нажмите /remove_delivery_courier_by_id_{cour['delivery_courier_id']}\n\n"""
+        mes += seller
+    return mes
+
+
 async def get_list_of_couriers_for_reset(couriers_list):
     """Формируем список курьеров для сбрасывания"""
     mes = ''
@@ -469,11 +482,11 @@ async def get_list_of_delivery_orders(orders):
     """Формируем список активных заказов"""
     mes = ''
     for ord in orders:
-        order = f"""Заказ № {ord['delivery_order_id']}. 
-{ord['delivery_order_info']}
-Сумма заказа: {ord['delivery_order_price']} руб.
-Дата доставки {ord['day_for_delivery'].strftime("%d.%m.%Y")} {weekdays[ord['day_for_delivery'].weekday()]}
-Время доставки {ord['delivery_time_info']}
+        order = f"""{blue_diamond_em}Заказ № {ord['delivery_order_id']}. 
+{await get_delivery_product_list(ord['delivery_order_id'])}
+Сумма заказа: {ord['delivery_order_final_price']} руб.
+Дата доставки {ord['delivery_order_day_for_delivery'].strftime("%d.%m.%Y")} {weekdays[ord['delivery_order_day_for_delivery'].weekday()]}
+Время доставки {ord['delivery_order_time_info']}
 {warning_em} Вы можете изменить дату и время доставки заказа не позднее, чем за 3 часа до доставки.
 {warning_em} Отменить заказ можно не позднее, чем за 12 часов до доставки.
 {warning_em} Внимание! После изменения даты/времени доставки, заказ отменить будет нельзя.
@@ -488,9 +501,8 @@ async def get_delivery_order_info_message(order_data):
 Номер заказа: № {order_data['delivery_order_id']}
 Адрес доставки: {order_data['location_name']}, 
 {order_data['location_address']}
-    {order_data['delivery_order_info']}
-Стоимость заказа: {order_data['delivery_order_price']} руб.
-Дата доставки: {order_data['day_for_delivery'].strftime("%d.%m.%Y")} {weekdays[order_data['day_for_delivery'].weekday()]}
-Время доставки: {order_data['delivery_time_info']}
-Статус заказа: {order_data['delivery_order_status']}
+    {await get_delivery_product_list(order_data['delivery_order_id'])}
+Стоимость заказа: {order_data['delivery_order_final_price']} руб.
+Дата доставки: {order_data['delivery_order_day_for_delivery'].strftime("%d.%m.%Y")} {weekdays[order_data['delivery_order_day_for_delivery'].weekday()]}
+Время доставки: {order_data['delivery_order_time_info']}
 """

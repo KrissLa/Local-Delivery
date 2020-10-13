@@ -10,7 +10,8 @@ from keyboards.inline.callback_datas import metro_data, categories_data, product
     admin_data, metro_del_data, location_data, new_item_size, edit_item_data, cancel_order_data, \
     delivery_categories_data, delivery_product_data, delivery_product_count_data, delivery_date_data, \
     delivery_time_data, take_delivery_order, dont_take_delivery_order, confirm_delivery_order, active_order_cancel_data, \
-    cancel_bonus_order_data_sellers
+    cancel_bonus_order_data_sellers, delivery_couriers_data, cancel_courier_data, courier_confirm_data, \
+    courier_confirm_changes
 from loader import db
 from utils.pagination import add_pagination
 from utils.temp_orders_list import get_formatted_date
@@ -47,6 +48,70 @@ async def generate_key_board_with_admins(page=0):
     admin_keyboard.add(cancel_button)
     return admin_keyboard
 
+
+async def gen_courier_confirm_markup(order_id, courier_id):
+    """"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text='Принять заказ',
+                    callback_data=courier_confirm_data.new(status='confirm',
+                                                           courier_id=courier_id,
+                                                           order_id=order_id)
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text='Не могу принять этот заказ',
+                    callback_data=courier_confirm_data.new(status='cancel',
+                                                           courier_id=courier_id,
+                                                           order_id=order_id)
+                )
+            ]
+        ]
+    )
+    return keyboard
+
+
+async def gen_courier_confirm_changes_markup(order_id, courier_id):
+    """"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text='Принять заказ',
+                    callback_data=courier_confirm_changes.new(status='confirm',
+                                                           courier_id=courier_id,
+                                                           order_id=order_id)
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text='Не могу принять этот заказ',
+                    callback_data=courier_confirm_changes.new(status='cancel',
+                                                           courier_id=courier_id,
+                                                           order_id=order_id)
+                )
+            ]
+        ]
+    )
+    return keyboard
+
+
+async def generate_delivery_couriers_keyboard(couriers, order_id):
+    """Формируем клавиатуру с курьерами"""
+    couriers_keyboard = InlineKeyboardMarkup()
+    for cour in couriers:
+        button = InlineKeyboardButton(
+            text=cour['delivery_courier_name'],
+            callback_data=delivery_couriers_data.new(delivery_courier_id=cour['delivery_courier_id'],
+                                                     delivery_courier_telegram_id=cour['delivery_courier_telegram_id'],
+                                                     order_id=order_id)
+        )
+        couriers_keyboard.add(button)
+    couriers_keyboard.add(InlineKeyboardButton(text='Отмена', callback_data=cancel_courier_data.new(order_id=order_id)))
+    return couriers_keyboard
 
 async def generate_couriers_keyboard(couriers, order_id):
     """Формируем клавиатуру с курьерами"""
@@ -538,25 +603,25 @@ async def generate_keyboard_with_counts_for_delivery_products(price, category_id
             [
                 InlineKeyboardButton(
                     text=f'2 лотка (24шт.) - {price * 2} руб.',
-                    callback_data=delivery_product_count_data.new(quantity=2, price=price * 2)
+                    callback_data=delivery_product_count_data.new(quantity=2, price=price)
                 )
             ],
             [
                 InlineKeyboardButton(
                     text=f'3 лотка (36шт.) - {price * 3} руб.',
-                    callback_data=delivery_product_count_data.new(quantity=3, price=price * 3)
+                    callback_data=delivery_product_count_data.new(quantity=3, price=price)
                 )
             ],
             [
                 InlineKeyboardButton(
                     text=f'4 лотка (48шт.) - {price * 4} руб.',
-                    callback_data=delivery_product_count_data.new(quantity=4, price=price * 4)
+                    callback_data=delivery_product_count_data.new(quantity=4, price=price)
                 )
             ],
             [
                 InlineKeyboardButton(
                     text=f'5 лотков (60шт.) - {price * 5} руб.',
-                    callback_data=delivery_product_count_data.new(quantity=5, price=price * 5)
+                    callback_data=delivery_product_count_data.new(quantity=5, price=price)
                 )
             ],
             [
@@ -1298,7 +1363,7 @@ async def gen_take_order_markup(order_id):
     take_delivery_order_markup = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text='Принять',
+                text='Принять и назначить курьера',
                 callback_data=take_delivery_order.new(order_id=order_id)
             )
         ],
@@ -1322,17 +1387,7 @@ async def gen_confirm_order_markup(order_id):
                 text='Заказ доставлен',
                 callback_data=confirm_delivery_order.new(order_id=order_id)
             )
-        ],
-        [
-            InlineKeyboardButton(
-                text='Отклонить',
-                callback_data=dont_take_delivery_order.new(order_id=order_id)
-            )
-        ],
-        [
-            back_button
-        ]
-    ])
+        ]])
     return take_delivery_order_markup
 
 cancel_order_user_markup = InlineKeyboardMarkup(inline_keyboard=[

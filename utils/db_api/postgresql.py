@@ -230,6 +230,18 @@ class Database:
                 """
         await self.pool.execute(sql)
 
+    async def create_table_delivery_couriers(self):
+        """Создаем таблицу Курьеров"""
+        sql = """
+                CREATE TABLE IF NOT EXISTS delivery_couriers (
+                delivery_courier_id SERIAL PRIMARY KEY,
+                delivery_courier_telegram_id INT NOT NULL UNIQUE,
+                delivery_courier_name VARCHAR(255) NOT NULL,
+                delivery_courier_status BOOLEAN NOT NULL DEFAULT true
+                );
+                """
+        await self.pool.execute(sql)
+
     async def create_table_users(self):  # Добавить фото
         """Создаем таблицу пользователей"""
         sql = """
@@ -348,27 +360,63 @@ class Database:
            """
         await self.pool.execute(sql)
 
+    # async def create_table_delivery_orders(self):
+    #     """Создаем таблицу заказов"""
+    #     sql = f"""
+    #        CREATE TABLE IF NOT EXISTS delivery_orders (
+    #        delivery_order_id SERIAL PRIMARY KEY,
+    #        delivery_order_user_telegram_id INT NOT NULL,
+    #        delivery_order_location_id INT NOT NULL,
+    #        delivery_order_created_at time DEFAULT now() NOT NULL,
+    #        day_for_delivery date,
+    #        de_time_for_delivery time,
+    #        delivery_datetime TIMESTAMP,
+    #        delivery_time_info delivery_time,
+    #        delivery_order_info TEXT,
+    #        delivery_order_price INT,
+    #        delivery_order_status delivery_or_status
+    #        );
+    #        """
+    #     try:
+    #         await self.pool.execute(
+    #             "CREATE TYPE delivery_or_status AS ENUM ('Ожидание подтверждения', 'Заказ подтвержден', 'Отменен', "
+    #             "'Заказ доставлен', 'Заказ изменен', 'Заказ подтвержден после изменения');")
+    #     except asyncpg.exceptions.DuplicateObjectError as err:
+    #         logging.error(err)
+    #     try:
+    #         await self.pool.execute(
+    #             "CREATE TYPE delivery_time AS ENUM ('c 08-00 до 10-00', 'с 10-00 до 12-00', 'с 12-00 до 14-00', "
+    #             "'с 14-00 до 16-00', 'с 16-00 до 18-00', 'с 18-00 до 20-00');")
+    #     except asyncpg.exceptions.DuplicateObjectError as err:
+    #         logging.error(err)
+    #     await self.pool.execute(sql)
+
     async def create_table_delivery_orders(self):
         """Создаем таблицу заказов"""
         sql = f"""
            CREATE TABLE IF NOT EXISTS delivery_orders (
            delivery_order_id SERIAL PRIMARY KEY,
-           delivery_order_user_telegram_id INT NOT NULL,
+           delivery_order_seller_admin_id INT NOT NULL,
+           delivery_order_admin_id INT,
+           delivery_order_courier_id INT,
            delivery_order_location_id INT NOT NULL,
-           delivery_order_created_at time DEFAULT now() NOT NULL,
-           day_for_delivery date,
-           de_time_for_delivery time,
-           delivery_datetime TIMESTAMP,
-           delivery_time_info delivery_time,
-           delivery_order_info TEXT,
-           delivery_order_price INT,
+           delivery_order_created_at timestamp DEFAULT now() NOT NULL,
+           delivery_order_canceled_at timestamp,
+           delivery_order_changed_at timestamp,
+           delivery_order_delivered_at timestamp,
+           delivery_order_day_for_delivery date,
+           dlivery_order_time_for_delivery time,
+           delivery_order_datetime TIMESTAMP,
+           delivery_order_time_info delivery_time,
+           delivery_order_final_price INT,
            delivery_order_status delivery_or_status
            );
            """
         try:
             await self.pool.execute(
-                "CREATE TYPE delivery_or_status AS ENUM ('Ожидание подтверждения', 'Заказ подтвержден', 'Отменен', "
-                "'Заказ доставлен', 'Заказ изменен', 'Заказ подтвержден после изменения');")
+                "CREATE TYPE delivery_or_status AS ENUM ('Ожидание подтверждения', 'Ожидание подтверждения курьером', "
+                "'Заказ подтвержден', 'Отменен клиентом', 'Отменен поставщиком', 'Курьер не назначен', "
+                "'Заказ выполнен');")
         except asyncpg.exceptions.DuplicateObjectError as err:
             logging.error(err)
         try:
@@ -377,6 +425,21 @@ class Database:
                 "'с 14-00 до 16-00', 'с 16-00 до 18-00', 'с 18-00 до 20-00');")
         except asyncpg.exceptions.DuplicateObjectError as err:
             logging.error(err)
+        await self.pool.execute(sql)
+
+    async def create_table_delivery_order_products(self):
+        """Создаем таблицу заказов"""
+        sql = """
+           CREATE TABLE IF NOT EXISTS delivery_order_products (
+           dop_order_id INT not null,
+           dop_product_id INT,
+           dop_product_name VARCHAR(255),
+           dop_quantity INT,
+           dop_price_per_unit INT,
+           dop_price INT,
+           FOREIGN KEY (dop_order_id) REFERENCES delivery_orders (delivery_order_id) ON DELETE CASCADE ON UPDATE CASCADE
+           );
+           """
         await self.pool.execute(sql)
 
     async def create_table_temp_orders(self):
@@ -676,6 +739,13 @@ AND is_local_object_available = true ORDER BY metro_id""")
         """Получаем товары из 'Корзины' """
         return await self.pool.fetch(
             f'SELECT * FROM temp_orders WHERE temp_order_user_telegram_id = {user_id} ORDER BY temp_order_id'
+        )
+
+    async def get_temp_delivery_orders(self, user_id):
+        """Получаем товары из 'Корзины' """
+        return await self.pool.fetch(
+            f'SELECT * FROM temp_delivery_orders WHERE temp_delivery_order_user_telegram_id = {user_id} '
+            f'ORDER BY temp_delivery_order_id'
         )
 
     async def get_last_temp_order_id(self, user_id):
@@ -1212,10 +1282,26 @@ WHERE order_id = {order_id}"""
             f'WHERE courier_location_id = {location_id} AND courier_status = true'
         )
 
+    async def get_delivery_couriers(self):
+        """Получаем список курьеров, закрепленных за локацией"""
+        return await self.pool.fetch(
+            f'SELECT delivery_courier_id, delivery_courier_telegram_id, delivery_courier_name'
+            f' FROM delivery_couriers '
+            f'WHERE delivery_courier_status = true'
+        )
+
     async def get_courier_name(self, courier_tg_id):
         """Получаем имя курьера"""
         return await self.pool.fetchval(
             f'SELECT courier_name FROM couriers WHERE courier_telegram_id = {courier_tg_id}'
+        )
+
+    async def get_delivery_courier_name(self, courier_tg_id):
+        """Получаем имя курьера"""
+        return await self.pool.fetchval(
+            f'SELECT delivery_courier_name '
+            f'FROM delivery_couriers'
+            f' WHERE delivery_courier_telegram_id = {courier_tg_id}'
         )
 
     async def update_order_courier(self, order_id, courier_tg_id):
@@ -1653,6 +1739,26 @@ order_final_price, user_telegram_id
                 count += 1
         return done
 
+    async def add_delivery_courier(self, delivery_courier_tg_id, courier_name):
+        """Добавляем админа"""
+        sql = """
+                INSERT INTO delivery_couriers (delivery_courier_telegram_id, delivery_courier_name) 
+                VALUES ($1, $2)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, delivery_courier_tg_id, courier_name)
+                done = True
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
+                count += 1
+        return done
+
     async def add_seller_admin_without_location(self, admin_telegram_id, admin_name):
         """Добавляем админа без привязки к локации"""
         sql = """
@@ -1807,6 +1913,12 @@ order_final_price, user_telegram_id
         """Проверяем админ или нет"""
         return await self.pool.fetchval(
             f'SELECT EXISTS(SELECT courier_telegram_id FROM couriers WHERE courier_telegram_id = {user_id})'
+        )
+
+    async def is_delivery_courier(self, user_id):
+        """Проверяем админ или нет"""
+        return await self.pool.fetchval(
+            f'SELECT EXISTS(SELECT delivery_courier_telegram_id FROM delivery_couriers WHERE delivery_courier_telegram_id = {user_id})'
         )
 
     async def is_client(self, user_id):
@@ -2096,6 +2208,12 @@ WHERE admin_seller_id = {sa_id}"""
             f"DELETE FROM couriers WHERE courier_id = {courier_id}"
         )
 
+    async def delete_delivery_courier_by_id(self, courier_id):
+        """Удаляем курьера"""
+        await self.pool.execute(
+            f"DELETE FROM delivery_couriers WHERE delivery_courier_id = {courier_id}"
+        )
+
     async def delete_product_by_id(self, product_id):
         """Удаляем категорию"""
         await self.pool.execute(
@@ -2230,6 +2348,12 @@ ORDER BY local_object_location_id
         """Получаем список Продавцов локаций"""
         return await self.pool.fetch(
             f"""SELECT * FROM couriers ORDER BY courier_id"""
+        )
+
+    async def get_delivery_courier_list(self):
+        """Получаем список Продавцов локаций"""
+        return await self.pool.fetch(
+            f"""SELECT * FROM delivery_couriers ORDER BY delivery_courier_id"""
         )
 
     async def get_products_list(self, category_id):
@@ -2821,6 +2945,13 @@ ORDER BY order_id"""
             f"""UPDATE couriers SET courier_status={status} WHERE courier_telegram_id = {user_id}"""
         )
 
+    async def im_at_work_delivery_courier(self, user_id, status):
+        """Устанавливаем статус продавца"""
+        await self.pool.execute(
+            f"""UPDATE delivery_couriers 
+SET delivery_courier_status={status} WHERE delivery_courier_telegram_id = {user_id}"""
+        )
+
     async def set_about(self, about):
         """Добавляем/изменяем инфу о компании"""
         await self.pool.execute(
@@ -2976,21 +3107,22 @@ WHERE temp_delivery_order_user_telegram_id = {user_id} ORDER BY - temp_delivery_
 
     async def add_delivery_order(self, user_id, order_data):
         """Добавляем новый заказ в таблицу"""
+        seller_admin = await self.pool.fetchval(f"select admin_seller_id from admin_sellers "
+                                                f"where admin_seller_telegram_id = {user_id}")
         sql = """
-        INSERT INTO delivery_orders (delivery_order_user_telegram_id, delivery_order_location_id, 
-        day_for_delivery, de_time_for_delivery, delivery_datetime, delivery_time_info, delivery_order_info,
-        delivery_order_price, delivery_order_status) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"""
+        INSERT INTO delivery_orders (delivery_order_seller_admin_id, delivery_order_location_id, 
+        delivery_order_day_for_delivery, dlivery_order_time_for_delivery, delivery_order_datetime, 
+        delivery_order_time_info, delivery_order_final_price, delivery_order_status) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"""
         done = False
         count = 0
         while not done:
             if count == 15:
                 break
             try:
-                await self.pool.execute(sql, user_id, order_data['location_id'], order_data['delivery_date'],
+                await self.pool.execute(sql, seller_admin, order_data['location_id'], order_data['delivery_date'],
                                         order_data['delivery_time'], order_data['delivery_datetime'],
-                                        order_data['choice'], order_data['list_of_products'],
-                                        order_data['final_price'], 'Ожидание подтверждения')
+                                        order_data['choice'], order_data['final_price'], 'Ожидание подтверждения')
                 done = True
             except asyncpg.exceptions.UniqueViolationError as err:
                 if count == 14:
@@ -3000,8 +3132,10 @@ WHERE temp_delivery_order_user_telegram_id = {user_id} ORDER BY - temp_delivery_
     async def get_delivery_order_id(self, user_id):
         """Получаем id последнего заказа"""
         return await self.pool.fetchval(
-            f"""SELECT delivery_order_id FROM delivery_orders 
-WHERE delivery_order_user_telegram_id = {user_id} ORDER BY -delivery_order_id"""
+            f"""SELECT delivery_order_id 
+FROM delivery_orders 
+WHERE delivery_order_seller_admin_id = (select admin_seller_id from admin_sellers where admin_seller_telegram_id = {user_id}) 
+ORDER BY -delivery_order_id"""
         )
 
     async def get_admins_list(self):
@@ -3014,16 +3148,19 @@ WHERE delivery_order_user_telegram_id = {user_id} ORDER BY -delivery_order_id"""
         """Получаем id последнего заказа"""
         return await self.pool.fetch(
             f"""SELECT * FROM delivery_orders 
-    WHERE delivery_order_user_telegram_id = {user_id} 
-AND delivery_order_status != 'Заказ доставлен'
-AND delivery_order_status != 'Отменен'
+    WHERE delivery_order_seller_admin_id = (select admin_seller_id from admin_sellers where admin_seller_telegram_id = {user_id}) 
+AND delivery_order_status not in ('Отменен клиентом', 'Отменен поставщиком', 'Заказ выполнен')
 ORDER BY delivery_order_id"""
         )
 
     async def is_user_owner(self, user_id, order_id):
         """Проверяем пользователь владелец заказа или нет"""
         return user_id == await self.pool.fetchval(
-            f"""SELECT delivery_order_user_telegram_id FROM delivery_orders WHERE delivery_order_id = {order_id}"""
+            f"""select admin_seller_telegram_id 
+from admin_sellers 
+where admin_seller_id = (SELECT delivery_order_seller_admin_id 
+                                    FROM delivery_orders 
+                                    WHERE delivery_order_id = {order_id})"""
         )
 
     async def get_order_datetime(self, order_id):
@@ -3041,21 +3178,22 @@ JOIN locations on delivery_order_location_id = location_id
 WHERE delivery_order_id = {order_id}"""
         )
 
-    async def update_delivery_order(self, order_id, changes):
+    async def update_delivery_order(self, order_id, changes, status):
         """Обновляем количество и цену после кнопки назад"""
         sql = f"""UPDATE delivery_orders 
-SET day_for_delivery = '{changes['new_delivery_date']}', 
-de_time_for_delivery = '{changes['new_delivery_time']}', 
-delivery_datetime = '{changes['new_delivery_datetime']}',
-delivery_time_info = '{changes['choice']}', 
-delivery_order_status = 'Заказ изменен'
+SET delivery_order_day_for_delivery = '{changes['new_delivery_date']}', 
+dlivery_order_time_for_delivery = '{changes['new_delivery_time']}', 
+delivery_order_datetime = '{changes['new_delivery_datetime']}',
+delivery_order_time_info = '{changes['choice']}', 
+delivery_order_changed_at = now(),
+delivery_order_status = '{status}'
             WHERE delivery_order_id = {order_id}"""
         await self.pool.execute(sql)
 
     async def cancel_delivery_order(self, order_id):
         """Обновляем количество и цену после кнопки назад"""
         sql = f"""UPDATE delivery_orders 
-        SET delivery_order_status = 'Отменен'
+        SET delivery_order_status = 'Отменен клиентом'
                 WHERE delivery_order_id = {order_id}"""
         await self.pool.execute(sql)
 
@@ -3065,9 +3203,43 @@ delivery_order_status = 'Заказ изменен'
 select * 
 from delivery_orders
 join locations on delivery_order_location_id = location_id
-where delivery_order_status = 'Заказ изменен'
-or  delivery_order_status = 'Ожидание подтверждения'
-order by  delivery_datetime;""")
+where delivery_order_status = 'Ожидание подтверждения'
+and delivery_order_admin_id is null
+and delivery_order_courier_id is null
+order by  delivery_order_datetime;""")
+
+    async def get_delivery_orders_for_couriers(self, user_id):
+        """Получаем список непринятых и измененных заказов"""
+        return await self.pool.fetch(f"""
+    select * 
+    from delivery_orders
+    join locations on delivery_order_location_id = location_id
+    where delivery_order_status = 'Курьер не назначен'
+    and delivery_order_admin_id = (select admin_id from admins where admin_telegram_id={user_id})
+    and delivery_order_courier_id is null
+    order by  delivery_order_datetime;""")
+
+    async def get_delivery_orders_awaiting_delivery(self, user_id):
+        """Получаем список непринятых и измененных заказов"""
+        return await self.pool.fetch(f"""
+    select * 
+    from delivery_orders
+    join locations on delivery_order_location_id = location_id
+    join delivery_couriers on delivery_courier_id = delivery_order_courier_id
+    where delivery_order_status = 'Заказ подтвержден'
+    and delivery_order_admin_id = (select admin_id from admins where admin_telegram_id={user_id})
+    and delivery_order_courier_id is not null
+    order by  delivery_order_datetime;""")
+
+    async def get_delivery_orders_awaiting_courier(self, user_id):
+        """Получаем список непринятых и измененных заказов"""
+        return await self.pool.fetch(f"""
+    select * 
+    from delivery_orders
+    join locations on delivery_order_location_id = location_id
+    where delivery_order_status = 'Ожидание подтверждения курьером'
+    and delivery_order_admin_id = (select admin_id from admins where admin_telegram_id={user_id})
+    order by  delivery_order_datetime;""")
 
     async def get_accepted_delivery_orders(self):
         """Получаем список непринятых и измененных заказов"""
@@ -3077,38 +3249,154 @@ order by  delivery_datetime;""")
     join locations on delivery_order_location_id = location_id
     where delivery_order_status = 'Заказ подтвержден'
     or  delivery_order_status = 'Заказ подтвержден после изменения'
-    order by  delivery_datetime;""")
+    order by  delivery_order_datetime;""")
+
+    async def get_accepted_delivery_orders_for_courier(self, courier_id):
+        """Получаем список непринятых и измененных заказов"""
+        return await self.pool.fetch(f"""
+    select * 
+    from delivery_orders
+    join locations on delivery_order_location_id = location_id
+    where delivery_order_status = 'Заказ подтвержден'
+    and delivery_order_courier_id = (select delivery_courier_id
+                                    from delivery_couriers
+                                    where delivery_courier_telegram_id = {courier_id})       
+    order by  delivery_order_datetime;""")
+
+    async def get_unaccepted_delivery_orders_for_courier(self, courier_id):
+        """Получаем список непринятых и измененных заказов"""
+        return await self.pool.fetch(f"""
+    select * 
+    from delivery_orders
+    join locations on delivery_order_location_id = location_id
+    where delivery_order_status = 'Ожидание подтверждения курьером'
+    and delivery_order_courier_id = (select delivery_courier_id
+                                    from delivery_couriers
+                                    where delivery_courier_telegram_id = {courier_id})       
+    order by  delivery_order_datetime;""")
 
     async def get_unaccepted_delivery_orders_ids(self):
         """Получаем список непринятых и измененных заказов"""
         return [order['delivery_order_id'] for order in await self.pool.fetch(f"""
     select delivery_order_id
     from delivery_orders
-    where delivery_order_status = 'Заказ изменен'
-    or  delivery_order_status = 'Ожидание подтверждения'""")]
+    where delivery_order_status = 'Ожидание подтверждения'""")]
 
     async def get_accepted_delivery_orders_ids(self):
         """Получаем список непринятых и измененных заказов"""
         return [order['delivery_order_id'] for order in await self.pool.fetch(f"""
     select delivery_order_id
     from delivery_orders
+    where delivery_order_status = 'Заказ подтвержден'""")]
+
+    async def get_accepted_delivery_orders_ids_for_courier(self, courier_id):
+        """Получаем список непринятых и измененных заказов"""
+        return [order['delivery_order_id'] for order in await self.pool.fetch(f"""
+    select delivery_order_id
+    from delivery_orders
     where delivery_order_status = 'Заказ подтвержден'
-    or  delivery_order_status = 'Заказ подтвержден после изменения'""")]
+    and delivery_order_courier_id = (select delivery_courier_id
+                                    from delivery_couriers
+                                    where delivery_courier_telegram_id = {courier_id}) """)]
 
     async def get_delivery_order_status(self, order_id):
         """Получаем статус заказа"""
         return await self.pool.fetchval(f"""
 SELECT delivery_order_status FROM delivery_orders WHERE delivery_order_id = {order_id}""")
 
+    async def get_delivery_admin_id(self, order_id):
+        """Получаем статус заказа"""
+        return await self.pool.fetchrow(f"""
+    SELECT delivery_order_admin_id, delivery_order_courier_id
+FROM delivery_orders WHERE delivery_order_id = {order_id}""")
+
+    async def get_delivery_admin_tg_id(self, order_id):
+        """Получаем тг id админа"""
+        return await self.pool.fetchval(f"""select admin_telegram_id from admins
+where admin_id=(SELECT delivery_order_admin_id FROM delivery_orders WHERE delivery_order_id = {order_id})""")
+
+    async def get_delivery_courier_tg_id(self, order_id):
+        """Получаем тг id админа"""
+        return await self.pool.fetchval(f"""select delivery_courier_telegram_id from delivery_couriers
+    where delivery_courier_id=(SELECT delivery_order_courier_id FROM delivery_orders WHERE delivery_order_id = {order_id})""")
+
+    async def get_admin_id(self, user_id):
+        """Получаем id админа"""
+        return await self.pool.fetchval(f"""
+select admin_id from admins where admin_telegram_id={user_id}""")
+
     async def get_delivery_order_owner(self, order_id):
         """Получаем статус заказа"""
         return await self.pool.fetchval(f"""
-    SELECT delivery_order_user_telegram_id FROM delivery_orders WHERE delivery_order_id = {order_id}""")
+    SELECT admin_seller_telegram_id 
+FROM admin_sellers 
+WHERE admin_seller_id = (select delivery_order_seller_admin_id from delivery_orders where delivery_order_id = {order_id})""")
 
-    async def update_delivery_order_status(self, order_id, status):
+    async def get_delivery_admin_telg_id(self, order_id):
+        """Получаем статус заказа"""
+        return await self.pool.fetchval(f"""
+        SELECT admin_telegram_id 
+    FROM admins 
+    WHERE admin_id = (select delivery_order_admin_id from delivery_orders where delivery_order_id = {order_id})""")
+
+    async def update_delivery_order_status(self, order_id, status, cancel_time=None):
         """Меняем статус"""
-        await self.pool.execute(f"""UPDATE delivery_orders SET delivery_order_status = '{status}'
+        if cancel_time:
+            await self.pool.execute(f"""UPDATE delivery_orders 
+SET delivery_order_status = '{status}',
+delivery_order_canceled_at = now()
 WHERE delivery_order_id = {order_id}""")
+        else:
+            await self.pool.execute(f"""UPDATE delivery_orders 
+SET delivery_order_status = '{status}'
+WHERE delivery_order_id = {order_id}""")
+
+    async def update_delivery_order_delivered_at(self, order_id, status):
+        """Меняем статус"""
+        await self.pool.execute(f"""UPDATE delivery_orders 
+    SET delivery_order_status = '{status}',
+    delivery_order_delivered_at = now()
+    WHERE delivery_order_id = {order_id}""")
+
+    async def update_delivery_order_admin(self, order_id, admin_id, status=None):
+        """Меняем статус"""
+        if status:
+            await self.pool.execute(f"""UPDATE delivery_orders 
+                SET delivery_order_admin_id = {admin_id},
+                delivery_order_status = '{status}'
+                WHERE delivery_order_id = {order_id}""")
+        else:
+            await self.pool.execute(f"""UPDATE delivery_orders 
+    SET delivery_order_admin_id = {admin_id}
+    WHERE delivery_order_id = {order_id}""")
+
+    async def update_delivery_order_courier_and_status(self, order_id, courier_id, status):
+        """Меняем статус"""
+        await self.pool.execute(f"""UPDATE delivery_orders 
+       SET delivery_order_courier_id = {courier_id},
+       delivery_order_status = '{status}'
+       WHERE delivery_order_id = {order_id}""")
+
+    async def update_delivery_order_courier_and_status_cancel(self, order_id):
+        """Меняем статус"""
+        await self.pool.execute(f"""UPDATE delivery_orders 
+       SET delivery_order_courier_id = null,
+       delivery_order_status = 'Курьер не назначен'
+       WHERE delivery_order_id = {order_id}""")
+
+    async def update_delivery_order_courier_null_and_status(self, order_id):
+        """Меняем статус"""
+        await self.pool.execute(f"""UPDATE delivery_orders 
+       SET delivery_order_courier_id = null,
+       delivery_order_status = 'Ожидание подтверждения курьером'
+       WHERE delivery_order_id = {order_id}""")
+
+    async def reset_delivery_order_admin(self, order_id):
+        """Меняем статус"""
+        await self.pool.execute(f"""UPDATE delivery_orders 
+    SET delivery_order_admin_id = null,
+    delivery_order_status = 'Ожидание подтверждения'
+    WHERE delivery_order_id = {order_id}""")
 
     async def update_delivery_product_price(self, item_id, price):
         """Меняем цену"""
@@ -3138,10 +3426,37 @@ SET delivery_price = '{price}'
                     logging.error(err)
                 count += 1
 
+    async def add_delivery_order_product(self, dop_order_id, order_detail):
+        """Добавляем выбранные товары к заказу"""
+        sql = """
+                INSERT INTO delivery_order_products (dop_order_id, dop_product_id, dop_product_name, dop_quantity, 
+                dop_price_per_unit, dop_price) 
+                VALUES ($1, $2, $3, $4, $5, $6)
+              """
+        done = False
+        count = 0
+        while not done:
+            if count == 15:
+                break
+            try:
+                await self.pool.execute(sql, dop_order_id, order_detail['delivery_product_id'],
+                                        order_detail['delivery_product_name'], order_detail['delivery_quantity'],
+                                        order_detail['delivery_product_price'], order_detail['delivery_order_price'])
+                done = True
+            except asyncpg.exceptions.UniqueViolationError as err:
+                if count == 14:
+                    logging.error(err)
+                count += 1
+
     async def get_order_products(self, order_id):
         """Получаем товары из заказа"""
         return await self.pool.fetch(f"""
 SELECT * FROM order_products WHERE op_order_id={order_id} order by op_order_id""")
+
+    async def get_delivery_order_products(self, order_id):
+        """Получаем товары из заказа"""
+        return await self.pool.fetch(f"""
+SELECT * FROM delivery_order_products WHERE dop_order_id={order_id} order by dop_order_id""")
 
     async def get_seller_admin_tg_id(self, order_id):
         """Получаем id админа локации"""

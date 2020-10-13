@@ -39,6 +39,7 @@ async def get_active_delivery_orders(message: types.Message, state: FSMContext):
 @dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['new_delivery_order'])
 async def add_new_seller(message: types.Message, state: FSMContext):
     """Новый оптовый заказ для производства"""
+    logging.info(await state.get_state())
     await reset_state(state, message)
     location_id = await db.get_seller_admin_location(message.from_user.id)
     address_info = await db.get_delivery_address_for_seller_admin(message.from_user.id)
