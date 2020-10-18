@@ -6,6 +6,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pytz import timezone
 
+from filters.users_filters import IsSellerAdminMessage
 from keyboards.inline.callback_datas import categories_data, delivery_categories_data, delivery_product_data, \
     back_to_product_list_data, delivery_product_count_data, remove_from_cart_data, delivery_date_data, \
     delivery_time_data
@@ -19,6 +20,7 @@ from loader import dp, db, bot
 from states.seller_admin_states import SellerAdmin
 from utils.emoji import attention_em_red, attention_em, warning_em, error_em, success_em
 from utils.send_messages import send_delivery_cart
+from utils.statistics import send_confirm_mail
 from utils.temp_orders_list import get_list_of_products_for_remove_from_stock, get_list_of_products_for_return_to_stock, \
     get_final_delivery_price, \
     get_temp_delivery_orders_list_message, get_list_of_delivery_orders, get_delivery_order_info_message, weekdays
@@ -298,3 +300,22 @@ async def cancel_add_admin(call: CallbackQuery, state: FSMContext):
     await call.message.edit_reply_markup()
     await state.finish()
     await call.message.answer('Вы отменили операцию')
+
+
+@dp.message_handler(IsSellerAdminMessage(), state=SellerAdmin.Email)
+async def update_email(message: types.Message, state: FSMContext):
+    """Обновляем email"""
+    email = message.text
+    name = await db.get_seller_admin_data(message.from_user.id)
+    logging.info(email)
+    try:
+        send_confirm_mail('Уведомление о привязке почты',
+                          f'Пользователь {name} привязал этот email-адрес для получения статистики.',
+                          email)
+        await db.update_email(email, message.from_user.id)
+        await message.answer(f'{success_em} E-mail адрес {email} успешно привязан.')
+        await state.finish()
+    except Exception as err:
+        logging.error(err)
+        await message.answer(f'{error_em} Не получилось привязать E-mail адрес {email}.\n'
+                             f'Проверьте правильность и введите адрес еще раз.')

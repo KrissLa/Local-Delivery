@@ -96,6 +96,8 @@ reviev_bonus_order_data = CallbackData('bonus_review', 'order_id')
 
 statistics_date_data = CallbackData('st_date', 'period')
 
+admin_statistics_date_data_all = CallbackData('st_admin_date', 'period')
+
 statistics_year_data = CallbackData('year_data', 'year')
 
 statistics_year_month_data = CallbackData('year_month', 'year', 'month')
@@ -105,5 +107,7 @@ statistics_day_data = CallbackData('day_data', 'day', 'month', 'year')
 courier_confirm_data = CallbackData('del_cour', 'status', 'courier_id', 'order_id')
 
 courier_confirm_changes = CallbackData('del_cour_changes', 'status', 'courier_id', 'order_id')
+
+statistics_location_data = CallbackData('st_location', "location_id")
 
 

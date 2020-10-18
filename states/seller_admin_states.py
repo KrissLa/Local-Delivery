@@ -45,3 +45,5 @@ class SellerAdmin(StatesGroup):
     Month = State()
     Day = State()
 
+    Email = State()
+

@@ -159,4 +159,15 @@ class AddAdmin(StatesGroup):
     DeliveryCourierID = State()
     RemoveDeliveryCourier = State()
 
+    Email = State()
+
+    Statistics = State()
+
+    Year = State()
+    Month = State()
+    Day = State()
+    LocYear = State()
+    LocMonth = State()
+    LocDay = State()
+
 

@@ -1,11 +1,41 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from keyboards.inline.callback_datas import statistics_date_data, statistics_year_data, statistics_year_month_data, \
-    statistics_day_data
+    statistics_day_data, statistics_location_data, admin_statistics_date_data_all
 from utils.pagination import add_pagination
 
 months_names = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь',
                 'Ноябрь', 'Декабрь']
+
+all_locations_button = InlineKeyboardButton(text='Все локации',
+                                            callback_data=statistics_location_data.new(location_id='all_locations'))
+
+
+async def generate_locations_keyboard(locations, page=0):
+    if len(locations) < 11:
+        keyboard = InlineKeyboardMarkup()
+        if page == 0:
+            keyboard.add(all_locations_button)
+        for location in locations:
+            button = InlineKeyboardButton(
+                text=location['location_name'],
+                callback_data=statistics_location_data.new(location_id=location['location_id'])
+            )
+            keyboard.add(button)
+    else:
+        buttons_list = []
+        if page == 0:
+            buttons_list.append(all_locations_button)
+        for location in locations:
+            button = InlineKeyboardButton(
+                text=location['location_name'],
+                callback_data=statistics_location_data.new(location_id=location['location_id'])
+            )
+            buttons_list.append([button])
+        keyboard = await add_pagination(buttons_list, page)
+    keyboard.add(InlineKeyboardButton(text='Отмена', callback_data='cancel'))
+    return keyboard
+
 
 period_markup = InlineKeyboardMarkup(inline_keyboard=[
     [
@@ -84,6 +114,87 @@ period_markup = InlineKeyboardMarkup(inline_keyboard=[
         InlineKeyboardButton(
             text='Отмена',
             callback_data='cancel_statistics'
+        )
+    ]
+])
+
+admin_period_markup = InlineKeyboardMarkup(inline_keyboard=[
+    [
+        InlineKeyboardButton(
+            text='За все время',
+            callback_data=admin_statistics_date_data_all.new(period='all_time')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='За сегодня',
+            callback_data=admin_statistics_date_data_all.new(period='today')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='За вчера',
+            callback_data=admin_statistics_date_data_all.new(period='yesterday')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='За текущую неделю',
+            callback_data=admin_statistics_date_data_all.new(period='this_week')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='За прошедшую неделю',
+            callback_data=admin_statistics_date_data_all.new(period='last_week')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='За текущий месяц',
+            callback_data=admin_statistics_date_data_all.new(period='this_month')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='За прошедший месяц',
+            callback_data=admin_statistics_date_data_all.new(period='last_month')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='За текущий год',
+            callback_data=admin_statistics_date_data_all.new(period='this_year')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='За прошедший год',
+            callback_data=admin_statistics_date_data_all.new(period='last_year')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='По дням',
+            callback_data=admin_statistics_date_data_all.new(period='by_days')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='По месяцам',
+            callback_data=admin_statistics_date_data_all.new(period='by_months')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='По годам',
+            callback_data=admin_statistics_date_data_all.new(period='by_years')
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='Назад',
+            callback_data='back_to_location_statistics'
         )
     ]
 ])

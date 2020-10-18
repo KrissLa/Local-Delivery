@@ -12,7 +12,8 @@ from keyboards.inline.statistics_keyboards import period_markup
 from loader import dp, db, bot
 from states.seller_admin_states import SellerAdmin
 from utils.check_states import states_for_menu, reset_state
-from utils.emoji import attention_em_red
+from utils.emoji import attention_em_red, warning_em, success_em, error_em
+from utils.statistics import send_email, send_confirm_mail
 from utils.temp_orders_list import get_list_of_delivery_orders, get_list_of_sellers_location, \
     get_list_of_couriers_location, get_list_of_category_for_remove_from_stock, get_list_of_category_for_return_to_stock
 from utils.test import generate_table
@@ -199,12 +200,26 @@ async def return_item_to_stock(message: types.Message, state: FSMContext):
     await SellerAdmin.ReturnItemToStockCategory.set()
 
 
+@dp.message_handler(IsSellerAdminMessage(), commands=['update_email'], state='*')
+async def get_email(message: types.Message, state: FSMContext):
+    """Обновляем email"""
+    await reset_state(state, message)
+    await message.answer('Пожалуйста, введите email адрес.')
+    await SellerAdmin.Email.set()
+
+
+
 @dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['get_statistics'], state='*')
 async def get_statistics(message: types.Message, state: FSMContext):
     """Получить статистику"""
     await reset_state(state, message)
-    await message.answer('Выберите период врмени, за который хотите получить статистику',
-                         reply_markup=period_markup)
+    if await db.get_email_seller(message.from_user.id):
+        await message.answer('Выберите период врмени, за который хотите получить статистику',
+                             reply_markup=period_markup)
+    else:
+        await message.answer(
+            f'{warning_em} Статистика будет отправлена на email. Чтобы получить статистику Вам сначала нужно ввести'
+            ' email адрес - /update_email')
 
 
 @dp.message_handler(IsSellerAdminMessage(), commands=['gen_orders'], state='*')
@@ -217,4 +232,3 @@ async def get_report(message: types.Message):
 async def get_report(message: types.Message):
     """Получаем статистику"""
     workbook = xlsxwriter.Workbook('hello.xlsx')
-
