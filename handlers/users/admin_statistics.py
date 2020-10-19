@@ -37,7 +37,7 @@ async def update_email(message: types.Message, state: FSMContext):
                              f'Проверьте правильность и введите адрес еще раз.')
 
 
-@dp.callback_query_handler(text='cancel', state=AddAdmin.Statistics)
+@dp.callback_query_handler(text='cancel')
 async def cancel(call: CallbackQuery):
     """Отмена"""
     await call.message.edit_reply_markup()

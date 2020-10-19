@@ -227,8 +227,3 @@ async def get_report(message: types.Message):
     """Получаем статистику"""
     await generate_table()
 
-
-@dp.message_handler(IsSellerAdminMessage(), commands=['get_report'], state='*')
-async def get_report(message: types.Message):
-    """Получаем статистику"""
-    workbook = xlsxwriter.Workbook('hello.xlsx')

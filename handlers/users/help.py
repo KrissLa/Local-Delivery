@@ -83,7 +83,11 @@ async def bot_help(message: types.Message, state: FSMContext):
         '50. Принять новые заказы - /take_orders',
         '51. Заказы, в которых не назначен курьер (Выбрать курьера для доставки заказа) - /delivery_order_set_courier',
         '52. Список заказов, ожидающих подтверждения курьером - /delivery_orders_awaiting_courier',
-        '53. Список заказов, ожидающих доставки - /delivery_orders_awaiting_delivery',
+        '53. Список заказов, ожидающих доставки - /delivery_orders_awaiting_delivery\n',
+
+        'Статистика:',
+        '54. Получить статистику - /get_statistics',
+        '54. Добавить/изменить email адрес для получения статистики - /update_email',
     ]
     await message.answer('\n'.join(text))
 
@@ -114,8 +118,9 @@ async def bot_help(message: types.Message, state: FSMContext):
         'Работа с оптовыми заказами:',
         '14. Создать новый заказ на поставку - /new_delivery_order',
         '15. Посмотреть/изменить/отменить заказы на поставку - /change_delivery_order\n',
-        'Статистика',
-        '16. Получить статистику - /get_statistics'
+        'Статистика:',
+        '16. Получить статистику - /get_statistics',
+        '17. Добавить/изменить email адрес для получения статистики - /update_email',
     ]
     await message.answer('\n'.join(text))
 

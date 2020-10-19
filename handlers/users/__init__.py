@@ -10,6 +10,7 @@ from .start import dp
 from .admin import dp
 from .admin_delivery_orders import dp
 from .admin_statistics import dp
+from .admin_delivery_statistics import dp
 from .seller_admins import dp
 from .seller_admin_delivery_orders import dp
 from .sellers_unaccepted_orders import dp

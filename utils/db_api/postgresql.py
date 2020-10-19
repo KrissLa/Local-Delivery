@@ -3531,6 +3531,19 @@ order by order_id;""")]
     where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
     order by order_id;""")]
 
+    async def get_delivery_orders(self):
+        """"""
+        return [dict(order) for order in await self.pool.fetch(f"""
+        select order_id, order_user_id, order_seller_id, order_courier_id, order_date, order_created_at, order_accepted_at, 
+        order_canceled_at, order_time_for_delivery, order_delivered_at, order_deliver_through,
+        order_final_price, order_delivery_method, order_status, order_review, order_reason_for_rejection, local_object_name, 
+        location_name
+        from orders 
+        join local_objects on local_object_id = order_local_object_id
+    	join locations on local_object_location_id = location_id
+        where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
+        order by order_id;""")]
+
     async def get_orders_by_date(self, first_day, last_day):
         """"""
         return [dict(order) for order in await self.pool.fetch(f"""
@@ -3749,6 +3762,14 @@ order by bonus_order_id
         where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
         order by order_id
 		limit 1;""")
+
+    async def get_first_delivery_order_date_admin(self):
+        """Получаем первый день периода"""
+        return await self.pool.fetchval(f"""
+            select delivery_order_created_at
+            from delivery_orders 
+            order by delivery_order_id
+    		limit 1;""")
 
     async def get_last_order_date(self, location_id):
         """Получаем первый день периода"""
@@ -5206,6 +5227,16 @@ where admin_telegram_id = {user_id}""")
 		order by location_id
         
         """)
+
+    async def get_all_delivery_locations(self):
+        """Выбираем локации в которых были заказы"""
+        return await self.pool.fetch("""
+            select distinct location_id, location_name
+            from delivery_orders
+            join locations on location_id = delivery_order_location_id
+    		order by location_id
+
+            """)
 
 
 

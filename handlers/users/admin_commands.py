@@ -7,7 +7,7 @@ from filters.users_filters import IsAdminMessage
 from keyboards.inline.inline_keyboards import generate_keyboard_with_delivery_categories_for_add_item, \
     cancel_admin_markup, gen_take_order_markup, gen_confirm_order_markup, generate_key_board_with_admins, \
     generate_key_board_with_metro, generate_keyboard_with_categories_for_add_item, generate_delivery_couriers_keyboard
-from keyboards.inline.statistics_keyboards import generate_locations_keyboard
+from keyboards.inline.statistics_keyboards import generate_locations_keyboard, generate_locations_keyboard_del
 from loader import dp, db
 from states.admin_state import AddAdmin
 from utils.check_states import states_for_menu, reset_state
@@ -809,6 +809,21 @@ async def get_statistics(message: types.Message, state: FSMContext):
         locations = await db.get_all_locations()
         await message.answer('Выберите локацию, по которой хотите получить статистику',
                              reply_markup=await generate_locations_keyboard(locations))
+
+    else:
+        await message.answer(
+            f'{warning_em} Статистика будет отправлена на email. Чтобы получить статистику Вам сначала нужно ввести'
+            ' email адрес - /update_email')
+
+
+@dp.message_handler(IsAdminMessage(), commands=['get_delivery_statistics'], state='*')
+async def get_statistics(message: types.Message, state: FSMContext):
+    """Получить статистику"""
+    await reset_state(state, message)
+    if await db.get_email_admin(message.from_user.id):
+        locations = await db.get_all_delivery_locations()
+        await message.answer('Выберите локацию, по которой хотите получить статистику',
+                             reply_markup=await generate_locations_keyboard_del(locations))
 
     else:
         await message.answer(
