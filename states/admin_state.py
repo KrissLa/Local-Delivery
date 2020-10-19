@@ -170,4 +170,10 @@ class AddAdmin(StatesGroup):
     LocMonth = State()
     LocDay = State()
 
+    DeliveryMonth = State()
+    DeliveryDay = State()
+
+    DeliveryLocMonth = State()
+    DeliveryLocDay = State()
+
 

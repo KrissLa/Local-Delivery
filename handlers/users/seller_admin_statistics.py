@@ -16,7 +16,7 @@ from pytz import timezone
 from keyboards.inline.callback_datas import statistics_date_data, statistics_year_data, statistics_year_month_data, \
     statistics_day_data
 from keyboards.inline.statistics_keyboards import gen_years_keyboard, period_markup, gen_months_keyboard, months_names, \
-    gen_days_keyboard
+    gen_days_keyboard, generate_delivery_period_keyboard
 from loader import dp, db, bot
 from states.admin_state import AddAdmin
 from states.seller_admin_states import SellerAdmin
@@ -1085,3 +1085,14 @@ async def get_statistics_by_day(call: CallbackQuery, callback_data: dict, state:
     }
 
     await run_blocking_tasks(data)
+
+
+
+
+
+@dp.callback_query_handler(text='cancek_delivery_stat', state='*')
+async def back(call: CallbackQuery, state: FSMContext):
+    """back"""
+    await call.message.edit_reply_markup()
+    await call.message.answer('Вы отменили операцию')
+    await state.finish()

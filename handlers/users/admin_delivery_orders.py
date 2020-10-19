@@ -140,7 +140,7 @@ async def cancel_order(call: CallbackQuery, state: FSMContext):
     # admin_id = await db.get_admin_id(call.from_user.id)
     if status == 'Ожидание подтверждения' and delivery_info['delivery_order_admin_id'] is None:
         try:
-            await db.update_delivery_order_status(order_id, 'Отменен поставщиком')
+            await db.update_delivery_order_status(order_id, 'Отменен поставщиком', True)
             await call.message.answer(f'{success_em} Заказ № {order_id} отменен.\n')
             await bot.send_message(order_owner, f'{error_em} Ваш заказ на поставку продуктов № {order_id} отменен.')
 

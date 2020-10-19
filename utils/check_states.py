@@ -122,7 +122,11 @@ states_for_menu = [ProfileState.WaitAddress,
                    AddAdmin.Statistics,
                    AddAdmin.LocYear,
                    AddAdmin.LocMonth,
-                   AddAdmin.LocDay]
+                   AddAdmin.LocDay,
+                   AddAdmin.DeliveryMonth,
+                   AddAdmin.DeliveryDay,
+                   AddAdmin.DeliveryLocMonth,
+                   AddAdmin.DeliveryLocDay]
 
 
 async def reset_state(state, message):
@@ -170,7 +174,8 @@ async def reset_state(state, message):
                                    'AddAdmin:DeliveryCourierID', 'AddAdmin:RemoveDeliveryCourier',
                                    'SellerAdmin:Email', 'AddAdmin:Year', 'AddAdmin:Month', 'AddAdmin:Day',
                                    'AddAdmin:Statistics', 'AddAdmin:LocYear', 'AddAdmin:LocMonth', 'AddAdmin:LocDay',
-                                   ]:
+                                   'AddAdmin:DeliveryMonth', 'AddAdmin:DeliveryDay', 'AddAdmin:DeliveryLocMonth',
+                                   'AddAdmin:DeliveryLocDay']:
         await state.finish()
     elif await state.get_state() in ['Menu:OrderStatus', 'Menu:WaitReasonUser', 'SelectCourier:WaitReasonCourier',
                                      'SelectCourier:WaitReason', 'SelectCourier:WaitReasonActive']:

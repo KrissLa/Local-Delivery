@@ -41,7 +41,8 @@ async def send_admin_delivery_statistics(data):
     mail_was_send = await loop.run_in_executor(
         None, write_admin_delivery_statistics, data)
     if mail_was_send:
-        await bot.send_message(data['user_id'], f"{success_em} Статистика по оптовым заказам отправлена Вам на почту {data['to_email']}.")
+        await bot.send_message(data['user_id'],
+                               f"{success_em} Статистика по оптовым заказам отправлена Вам на почту {data['to_email']}.")
     else:
         await bot.send_message(data['user_id'],
                                f"{error_em} Не удалось отправить статистику по адресу {data['to_email']}."
@@ -129,6 +130,31 @@ def get_orders(orders, products, numbers):
             logging.error(err)
         try:
             while numbers[0]['order_id'] == order['order_id']:
+                order['num'] = num
+                order['first_line'] = first_line
+                order['last_line'] = first_line + numbers[0]["count"] - 1
+                first_line += numbers[0]["count"]
+                num += 1
+                del numbers[0]
+        except Exception as err:
+            logging.error(err)
+    return orders
+
+
+def get_delivery_orders(orders, products, numbers):
+    """Формируем список"""
+    num = 1
+    first_line = 4
+    for order in orders:
+        order['order_products'] = []
+        try:
+            while products[0]['dop_order_id'] == order['delivery_order_id']:
+                order['order_products'].append(products[0])
+                del products[0]
+        except Exception as err:
+            logging.error(err)
+        try:
+            while numbers[0]['delivery_order_id'] == order['delivery_order_id']:
                 order['num'] = num
                 order['first_line'] = first_line
                 order['last_line'] = first_line + numbers[0]["count"] - 1
@@ -1362,16 +1388,434 @@ def write_admin_statistics(data):
         return False
 
 
+def head_delivery_indicators_admin(worksheet, head_format, body_format):
+    """Шапка для первого листа"""
+    worksheet.set_column(0, 0, 1)
+
+    worksheet.write('B4', 'Показатели за период', head_format)
+    worksheet.set_column(1, 1, 40)
+    worksheet.write('C4', 'Кол-во', head_format)
+    worksheet.set_column(2, 2, 20)
+    worksheet.write('D4', 'На сумму (руб)', head_format)
+    worksheet.set_column(3, 3, 20)
+    worksheet.write('B5', 'Всего заказов', body_format)
+    worksheet.write('B6', 'в т.ч. Выполнено', body_format)
+    worksheet.write('B7', 'в т.ч. В обработке', body_format)
+    worksheet.write('B8', 'в т.ч. Еще не принят', body_format)
+    worksheet.write('B9', 'в т.ч. Отменен поставщиком', body_format)
+    worksheet.write('B10', 'в т.ч. Отменен заказчиком', body_format)
+
+    worksheet.merge_range('F4:F5', 'Точка продаж', head_format)
+    worksheet.set_column(5, 5, 40)
+    worksheet.set_column(6, 17, 13)
+    worksheet.merge_range('G4:H4', 'Всего', head_format)
+    worksheet.merge_range('I4:J4', 'Выполнено', head_format)
+    worksheet.merge_range('K4:L4', 'В обработке', head_format)
+    worksheet.merge_range('M4:N4', 'Еще не принят', head_format)
+    worksheet.merge_range('O4:P4', 'Отменен поставщиком', head_format)
+    worksheet.merge_range('Q4:R4', 'Отменен заказчиком', head_format)
+
+    worksheet.write('G5', 'кол-во', head_format)
+    worksheet.write('H5', 'на сумму', head_format)
+    worksheet.write('I5', 'кол-во', head_format)
+    worksheet.write('J5', 'на сумму', head_format)
+    worksheet.write('K5', 'кол-во', head_format)
+    worksheet.write('L5', 'на сумму', head_format)
+    worksheet.write('M5', 'кол-во', head_format)
+    worksheet.write('N5', 'на сумму', head_format)
+    worksheet.write('O5', 'кол-во', head_format)
+    worksheet.write('P5', 'на сумму', head_format)
+    worksheet.write('Q5', 'кол-во', head_format)
+    worksheet.write('R5', 'на сумму', head_format)
+
+
+def head_delivery_orders_admin(worksheet, head_format):
+    """Шапка второго листа"""
+    worksheet.set_column(0, 0, 1)
+    worksheet.set_row(1, 30)
+    worksheet.set_row(2, 30)
+    worksheet.merge_range('B2:B3', '№', head_format)
+    worksheet.set_column(1, 1, 8)
+    worksheet.merge_range('C2:D2', 'Период', head_format)
+    worksheet.set_column(2, 3, 10)
+    worksheet.write('C3', 'с', head_format)
+    worksheet.write('D3', 'по', head_format)
+    worksheet.merge_range('E2:E3', 'Точка\nпродаж', head_format)
+    worksheet.set_column(4, 4, 30)
+    worksheet.merge_range('F2:F3', 'ID\nпоставщика', head_format)  #####
+    worksheet.merge_range('G2:G3', 'ID\nзаказчика', head_format)
+    worksheet.merge_range('H2:H3', 'ID\nкурьера', head_format)
+    worksheet.merge_range('I2:I3', 'Дата\nзаказа', head_format)
+    worksheet.merge_range('J2:J3', 'Дата\nотмены заказа', head_format)
+    worksheet.merge_range('K2:K3', 'Дата последнего\nизменения заказа', head_format)
+    worksheet.merge_range('L2:L3', 'Дата\nдоставки', head_format)
+    worksheet.merge_range('M2:M3', 'Время\nдоставки', head_format)
+    worksheet.merge_range('N2:N3', 'Доставлен в', head_format)
+    worksheet.merge_range('O2:O3', '№\nзаказа', head_format)
+    worksheet.merge_range('P2:P3', 'Заказанные позиции', head_format)
+    worksheet.set_column(5, 5, 12)
+    worksheet.set_column(6, 7, 10)
+    worksheet.set_column(8, 13, 20)
+    worksheet.set_column(14, 14, 8)
+    worksheet.merge_range('Q2:Q3', 'Кол-во', head_format)
+    worksheet.set_column(15, 15, 30)
+    worksheet.merge_range('R2:R3', 'Цена\nза ед.\n(руб)', head_format)
+    worksheet.merge_range('S2:S3', 'Сумма\nзаказа\n(руб)', head_format)
+    worksheet.merge_range('T2:T3', 'Статус\nзаказа', head_format)
+    worksheet.set_column(16, 19, 10)
+    worksheet.set_column(19, 19, 25)
+
+
+def head_delivery_sellers_admin(worksheet, head_format):
+    """Шапка четвертого листа"""
+    worksheet.set_column(0, 0, 1)
+    worksheet.set_row(1, 30)
+    worksheet.set_row(2, 30)
+    worksheet.merge_range('B2:B3', '№', head_format)
+    worksheet.set_column(1, 1, 8)
+    worksheet.merge_range('C2:D2', 'Период', head_format)
+    worksheet.set_column(2, 3, 10)
+    worksheet.set_column(4, 5, 15)
+    worksheet.set_column(6, 6, 25)
+    worksheet.set_column(7, 7, 15)
+    worksheet.set_column(8, 8, 10)
+    worksheet.set_column(9, 9, 15)
+    worksheet.set_column(10, 10, 10)
+    worksheet.write('C3', 'с', head_format)
+    worksheet.write('D3', 'по', head_format)
+    worksheet.merge_range('E2:E3', 'ID\nпоставщика', head_format)
+    worksheet.merge_range('F2:F3', 'telegramID\nпоставщика', head_format)
+    worksheet.merge_range('G2:G3', 'Имя поставщика', head_format)
+    worksheet.merge_range('H2:I2', 'Заказы', head_format)
+    worksheet.write('H3', 'наименование', head_format)
+    worksheet.write('I3', 'кол-во', head_format)
+
+
+def head_delivery_couriers(worksheet, head_format):
+    """Шапка пятого листа"""
+    worksheet.set_column(0, 0, 1)
+    worksheet.set_row(1, 30)
+    worksheet.set_row(2, 30)
+    worksheet.merge_range('B2:B3', '№', head_format)
+    worksheet.set_column(1, 1, 8)
+    worksheet.merge_range('C2:D2', 'Период', head_format)
+    worksheet.set_column(2, 3, 10)
+    worksheet.set_column(4, 5, 15)
+    worksheet.set_column(6, 6, 25)
+    worksheet.set_column(7, 7, 15)
+    worksheet.set_column(8, 8, 10)
+    worksheet.set_column(9, 9, 15)
+    worksheet.set_column(10, 10, 10)
+    worksheet.write('C3', 'с', head_format)
+    worksheet.write('D3', 'по', head_format)
+    worksheet.merge_range('E2:E3', 'ID\nкурьера', head_format)
+    worksheet.merge_range('F2:F3', 'telegramID\nкурьера', head_format)
+    worksheet.merge_range('G2:G3', 'Имя курьера', head_format)
+    worksheet.merge_range('H2:I2', 'Заказы', head_format)
+    worksheet.write('H3', 'наименование', head_format)
+    worksheet.write('I3', 'кол-во', head_format)
+
+
+def head_delivery_clients_admin(worksheet, head_format):
+    """Шапка шестого листа"""
+    worksheet.set_column(0, 0, 1)
+    worksheet.set_row(1, 30)
+    worksheet.set_row(2, 30)
+    worksheet.merge_range('B2:B3', '№', head_format)
+    worksheet.set_column(1, 1, 8)
+    worksheet.merge_range('C2:D2', 'Период', head_format)
+    worksheet.set_column(2, 3, 10)
+    worksheet.set_column(4, 4, 30)
+    worksheet.set_column(5, 6, 15)
+    worksheet.set_column(7, 7, 30)
+    worksheet.set_column(8, 9, 15)
+    worksheet.write('C3', 'с', head_format)
+    worksheet.write('D3', 'по', head_format)
+    worksheet.merge_range('E2:E3', 'Точка\nпродаж', head_format)
+    worksheet.merge_range('F2:F3', 'ID\nклиента', head_format)
+    worksheet.merge_range('G2:G3', 'telegramID\nклиента', head_format)
+    worksheet.merge_range('H2:H3', 'Имя\nклиента', head_format)
+    worksheet.merge_range('I2:J2', 'Заказы', head_format)
+    worksheet.write('I3', 'наименование', head_format)
+    worksheet.write('J3', 'кол-во', head_format)
+
+
+def body_delivery_indicators_admin(worksheet, body_format, indicators, indicators_by_loc):
+    """Записываем показатели"""
+    if indicators:
+        worksheet.write('C5', f'{indicators["all_orders"]}', body_format)
+        worksheet.write('C6', f'{indicators["completed"]}', body_format)
+        worksheet.write('C7', f'{indicators["waitings"]}', body_format)
+        worksheet.write('C8', f'{indicators["wait_confirm"]}', body_format)
+        worksheet.write('C9', f'{indicators["canceled_by_seller"]}', body_format)
+        worksheet.write('C10', f'{indicators["canceled_by_client"]}', body_format)
+
+        worksheet.write('D5', f'{indicators["all_orders_price"]}', body_format)
+        worksheet.write('D6', f'{indicators["completed_price"]}', body_format)
+        worksheet.write('D7', f'{indicators["waitings_price"]}', body_format)
+        worksheet.write('D8', f'{indicators["wait_confirm_price"]}', body_format)
+        worksheet.write('D9', f'{indicators["canceled_by_seller_price"]}', body_format)
+        worksheet.write('D10', f'{indicators["canceled_by_client_price"]}', body_format)
+
+    if indicators_by_loc:
+        first_line = 6
+        for ind in indicators_by_loc:
+            worksheet.write(f'F{first_line}', f"{ind['location_name']}", body_format)
+            worksheet.write(f'G{first_line}', f"{ind['all_orders']}", body_format)
+            worksheet.write(f'H{first_line}', f"{ind['all_orders_price']}", body_format)
+            worksheet.write(f'I{first_line}', f"{ind['completed']}", body_format)
+            worksheet.write(f'J{first_line}', f"{ind['completed_price']}", body_format)
+            worksheet.write(f'K{first_line}', f"{ind['waitings']}", body_format)
+            worksheet.write(f'L{first_line}', f"{ind['waitings_price']}", body_format)
+            worksheet.write(f'M{first_line}', f"{ind['wait_confirm']}", body_format)
+            worksheet.write(f'N{first_line}', f"{ind['wait_confirm_price']}", body_format)
+            worksheet.write(f'O{first_line}', f"{ind['canceled_by_seller']}", body_format)
+            worksheet.write(f'P{first_line}', f"{ind['canceled_by_seller_price']}", body_format)
+            worksheet.write(f'Q{first_line}', f"{ind['canceled_by_client']}", body_format)
+            worksheet.write(f'R{first_line}', f"{ind['canceled_by_client_price']}", body_format)
+            first_line += 1
+
+
+def body_delivery_orders_admin(worksheet, body_format, orders, start_period, end_period):
+    """Записываем заказы"""
+    if orders:
+        for order in orders:
+            if len(order['order_products']) > 1:
+                worksheet.merge_range(f'B{order["first_line"]}:B{order["last_line"]}', f'{order["num"]}', body_format)
+                worksheet.merge_range(f'C{order["first_line"]}:C{order["last_line"]}', f'{start_period}', body_format)
+                worksheet.merge_range(f'D{order["first_line"]}:D{order["last_line"]}', f'{end_period}', body_format)
+                worksheet.merge_range(f'E{order["first_line"]}:E{order["last_line"]}', f'{order["location_name"]}',
+                                      body_format)
+                if order["delivery_order_admin_id"]:
+                    worksheet.merge_range(f'F{order["first_line"]}:F{order["last_line"]}',
+                                          f'{order["delivery_order_admin_id"]}',
+                                          body_format)
+                else:
+                    worksheet.merge_range(f'F{order["first_line"]}:F{order["last_line"]}', f'', body_format)
+
+                worksheet.merge_range(f'G{order["first_line"]}:G{order["last_line"]}',
+                                      f'{order["delivery_order_seller_admin_id"]}',
+                                      body_format)
+
+                if order["delivery_order_courier_id"]:
+                    worksheet.merge_range(f'H{order["first_line"]}:H{order["last_line"]}',
+                                          f'{order["delivery_order_courier_id"]}',
+                                          body_format)
+                else:
+                    worksheet.merge_range(f'H{order["first_line"]}:H{order["last_line"]}', f'', body_format)
+
+                worksheet.merge_range(f'I{order["first_line"]}:I{order["last_line"]}',
+                                      f'{order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}',
+                                      body_format)
+                if order['delivery_order_canceled_at']:
+                    worksheet.merge_range(f'J{order["first_line"]}:J{order["last_line"]}',
+                                          f'{order["delivery_order_canceled_at"].strftime("%d.%m.%Y %H:%M")}',
+                                          body_format)
+                else:
+                    worksheet.merge_range(f'J{order["first_line"]}:J{order["last_line"]}', f'', body_format)
+
+                if order['delivery_order_changed_at']:
+                    worksheet.merge_range(f'K{order["first_line"]}:K{order["last_line"]}',
+                                          f'{order["delivery_order_changed_at"].strftime("%d.%m.%Y %H:%M")}',
+                                          body_format)
+                else:
+                    worksheet.merge_range(f'K{order["first_line"]}:K{order["last_line"]}', f'', body_format)
+
+                worksheet.merge_range(f'L{order["first_line"]}:L{order["last_line"]}',
+                                      f'{order["delivery_order_day_for_delivery"].strftime("%d.%m.%Y")}',
+                                      body_format)
+                worksheet.merge_range(f'M{order["first_line"]}:M{order["last_line"]}',
+                                      f'{order["delivery_order_time_info"]}',
+                                      body_format)
+
+                if order["delivery_order_delivered_at"]:
+                    worksheet.merge_range(f'N{order["first_line"]}:N{order["last_line"]}',
+                                          f'{order["delivery_order_delivered_at"].strftime("%H:%M:%S")}',
+                                          body_format)
+                else:
+                    worksheet.merge_range(f'N{order["first_line"]}:N{order["last_line"]}', f'', body_format)
+
+                worksheet.merge_range(f'O{order["first_line"]}:O{order["last_line"]}',
+                                      f'{order["delivery_order_id"]}',
+                                      body_format)
+
+                worksheet.merge_range(f'S{order["first_line"]}:S{order["last_line"]}',
+                                      f'{order["delivery_order_final_price"]}',
+                                      body_format)
+                worksheet.merge_range(f'T{order["first_line"]}:T{order["last_line"]}',
+                                      f'{order["delivery_order_status"]}',
+                                      body_format)
+
+                first_prod_line = order["first_line"]
+                for prod in order['order_products']:
+                    worksheet.write(f'P{first_prod_line}', f'{prod["dop_product_name"]}', body_format)
+                    worksheet.write(f'Q{first_prod_line}', f'{prod["dop_quantity"]}', body_format)
+                    worksheet.write(f'R{first_prod_line}', f'{prod["dop_price_per_unit"]}', body_format)
+                    first_prod_line += 1
+            else:
+                worksheet.write(f'B{order["first_line"]}', f'{order["num"]}', body_format)
+                worksheet.write(f'C{order["first_line"]}', f'{start_period}', body_format)
+                worksheet.write(f'D{order["first_line"]}', f'{end_period}', body_format)
+                worksheet.write(f'E{order["first_line"]}', f'{order["location_name"]}', body_format)
+
+                if order["delivery_order_admin_id"]:
+                    worksheet.write(f'F{order["first_line"]}',
+                                    f'{order["delivery_order_admin_id"]}',
+                                    body_format)
+                else:
+                    worksheet.write(f'F{order["first_line"]}', f'', body_format)
+
+                worksheet.write(f'G{order["first_line"]}',
+                                f'{order["delivery_order_seller_admin_id"]}',
+                                body_format)
+
+                if order["delivery_order_courier_id"]:
+                    worksheet.write(f'H{order["first_line"]}',
+                                    f'{order["delivery_order_courier_id"]}',
+                                    body_format)
+                else:
+                    worksheet.write(f'H{order["first_line"]}', f'', body_format)
+
+                worksheet.write(f'I{order["first_line"]}',
+                                f'{order["delivery_order_created_at"].strftime("%d.%m.%Y %H:%M")}',
+                                body_format)
+                if order['delivery_order_canceled_at']:
+                    worksheet.write(f'J{order["first_line"]}',
+                                    f'{order["delivery_order_canceled_at"].strftime("%d.%m.%Y %H:%M")}',
+                                    body_format)
+                else:
+                    worksheet.write(f'J{order["first_line"]}', f'', body_format)
+
+                if order['delivery_order_changed_at']:
+                    worksheet.write(f'K{order["first_line"]}',
+                                    f'{order["delivery_order_changed_at"].strftime("%d.%m.%Y %H:%M")}',
+                                    body_format)
+                else:
+                    worksheet.write(f'K{order["first_line"]}', f'', body_format)
+
+                worksheet.write(f'L{order["first_line"]}',
+                                f'{order["delivery_order_day_for_delivery"].strftime("%d.%m.%Y")}',
+                                body_format)
+                worksheet.write(f'M{order["first_line"]}',
+                                f'{order["delivery_order_time_info"]}',
+                                body_format)
+
+                if order["delivery_order_delivered_at"]:
+                    worksheet.write(f'N{order["first_line"]}',
+                                    f'{order["delivery_order_delivered_at"].strftime("%H:%M:%S")}',
+                                    body_format)
+                else:
+                    worksheet.write(f'N{order["first_line"]}', f'', body_format)
+
+                worksheet.write(f'O{order["first_line"]}',
+                                f'{order["delivery_order_id"]}',
+                                body_format)
+
+                worksheet.write(f'S{order["first_line"]}',
+                                f'{order["delivery_order_final_price"]}',
+                                body_format)
+                worksheet.write(f'T{order["first_line"]}',
+                                f'{order["delivery_order_status"]}',
+                                body_format)
+                first_prod_line = order["first_line"]
+                for prod in order['order_products']:
+                    worksheet.write(f'P{first_prod_line}', f'{prod["dop_product_name"]}', body_format)
+                    worksheet.write(f'Q{first_prod_line}', f'{prod["dop_quantity"]}', body_format)
+                    worksheet.write(f'R{first_prod_line}', f'{prod["dop_price_per_unit"]}', body_format)
+                    first_prod_line += 1
+
+
+def body_delivery_sellers_admin(worksheet, body_format, sellers, start_period, end_period):
+    """Записываем продавцов"""
+    if sellers:
+        first_string = 4
+        num = 1
+        for seller in sellers:
+            ls = first_string + 4
+
+            worksheet.merge_range(f'B{first_string}:B{ls}', f'{num}', body_format)
+            worksheet.merge_range(f'C{first_string}:C{ls}', f'{start_period}', body_format)
+            worksheet.merge_range(f'D{first_string}:D{ls}', f'{end_period}', body_format)
+            worksheet.merge_range(f'E{first_string}:E{ls}', f'{seller["delivery_order_admin_id"]}', body_format)
+            worksheet.merge_range(f'F{first_string}:F{ls}', f'{seller["admin_telegram_id"]}', body_format)
+            worksheet.merge_range(f'G{first_string}:G{ls}', f'{seller["admin_name"]}', body_format)
+            worksheet.write(f'H{first_string}', f'Всего', body_format)
+            worksheet.write(f'I{first_string}', f'{seller["all_orders"]}', body_format)
+            worksheet.write(f'H{first_string + 1}', f'Выполнено', body_format)
+            worksheet.write(f'I{first_string + 1}', f'{seller["completed"]}', body_format)
+            worksheet.write(f'H{first_string + 2}', f'Отменено поставщиком', body_format)
+            worksheet.write(f'I{first_string + 2}', f'{seller["canceled_by_seller"]}', body_format)
+            worksheet.write(f'H{first_string + 3}', f'Отменено заказчиком', body_format)
+            worksheet.write(f'I{first_string + 3}', f'{seller["canceled_by_client"]}', body_format)
+            worksheet.write(f'H{first_string + 4}', f'В процессе', body_format)
+            worksheet.write(f'I{first_string + 4}', f'{seller["waitings"]}', body_format)
+            first_string += 5
+            num += 1
+
+
+def body_delivery_couriers(worksheet, body_format, couriers, start_period, end_period):
+    """Записываем курьеров"""
+    if couriers:
+        first_string = 4
+        num = 1
+        for courier in couriers:
+            ls = first_string + 4
+
+            worksheet.merge_range(f'B{first_string}:B{ls}', f'{num}', body_format)
+            worksheet.merge_range(f'C{first_string}:C{ls}', f'{start_period}', body_format)
+            worksheet.merge_range(f'D{first_string}:D{ls}', f'{end_period}', body_format)
+            worksheet.merge_range(f'E{first_string}:E{ls}', f'{courier["delivery_order_courier_id"]}', body_format)
+            worksheet.merge_range(f'F{first_string}:F{ls}', f'{courier["delivery_courier_telegram_id"]}', body_format)
+            worksheet.merge_range(f'G{first_string}:G{ls}', f'{courier["delivery_courier_name"]}', body_format)
+            worksheet.write(f'H{first_string}', f'Всего', body_format)
+            worksheet.write(f'I{first_string}', f'{courier["all_orders"]}', body_format)
+            worksheet.write(f'H{first_string + 1}', f'Выполнено', body_format)
+            worksheet.write(f'I{first_string + 1}', f'{courier["completed"]}', body_format)
+            worksheet.write(f'H{first_string + 2}', f'Отменено поставщиком', body_format)
+            worksheet.write(f'I{first_string + 2}', f'{courier["canceled_by_seller"]}', body_format)
+            worksheet.write(f'H{first_string + 3}', f'Отменено заказчиком', body_format)
+            worksheet.write(f'I{first_string + 3}', f'{courier["canceled_by_client"]}', body_format)
+            worksheet.write(f'H{first_string + 4}', f'В процессе', body_format)
+            worksheet.write(f'I{first_string + 4}', f'{courier["waitings"]}', body_format)
+            first_string += 5
+            num += 1
+
+
+def body_delivery_clients_admin(worksheet, body_format, sellers, start_period, end_period):
+    """Записываем продавцов"""
+    if sellers:
+        first_string = 4
+        num = 1
+        for seller in sellers:
+
+            ls = first_string + 4
+
+            worksheet.merge_range(f'B{first_string}:B{ls}', f'{num}', body_format)
+            worksheet.merge_range(f'C{first_string}:C{ls}', f'{start_period}', body_format)
+            worksheet.merge_range(f'D{first_string}:D{ls}', f'{end_period}', body_format)
+            worksheet.merge_range(f'E{first_string}:E{ls}', f'{seller["location_name"]}', body_format)
+            worksheet.merge_range(f'F{first_string}:F{ls}', f'{seller["delivery_order_seller_admin_id"]}', body_format)
+            worksheet.merge_range(f'G{first_string}:G{ls}', f'{seller["admin_seller_telegram_id"]}', body_format)
+            worksheet.merge_range(f'H{first_string}:H{ls}', f'{seller["admin_seller_name"]}', body_format)
+            worksheet.write(f'I{first_string}', f'Всего', body_format)
+            worksheet.write(f'J{first_string}', f'{seller["all_orders"]}', body_format)
+            worksheet.write(f'I{first_string + 1}', f'Выполнено', body_format)
+            worksheet.write(f'J{first_string + 1}', f'{seller["completed"]}', body_format)
+            worksheet.write(f'I{first_string + 2}', f'Отменено поставщиком', body_format)
+            worksheet.write(f'J{first_string + 2}', f'{seller["canceled_by_seller"]}', body_format)
+            worksheet.write(f'I{first_string + 3}', f'Отменено заказчиком', body_format)
+            worksheet.write(f'J{first_string + 3}', f'{seller["canceled_by_client"]}', body_format)
+            worksheet.write(f'I{first_string + 4}', f'В процессе', body_format)
+            worksheet.write(f'J{first_string + 4}', f'{seller["waitings"]}', body_format)
+
+            first_string += 5
+            num += 1
+
 
 def write_admin_delivery_statistics(data):
     """Записываем статистику"""
-    # orders = get_orders(data['orders'], data['products'], data['numbers'])
-    #
-    # users = get_users_indicators(data['user_orders'], data['user_bonus_orders'])
-    #
-    # sellers = get_sellers_indicators(data['sellers_orders'], data['sellers_bonus'])
-    #
-    # threads = []
+    orders = get_delivery_orders(data['orders'], data['products'], data['numbers'])
+    threads = []
 
     workbook = xlsxwriter.Workbook(data['path'])
 
@@ -1384,61 +1828,54 @@ def write_admin_delivery_statistics(data):
     worksheet4 = workbook.add_worksheet('Курьеры')
     worksheet5 = workbook.add_worksheet('Заказчики')
 
-    # o = threading.Thread(target=body_orders_admin, args=(worksheet2, body_format, orders,
-    #                                                      data['first_period'].strftime("%d.%m.%Y"),
-    #                                                      data['end_period'].strftime("%d.%m.%Y")))
-    # o.start()
-    # threads.append(o)
-    #
-    # b = threading.Thread(target=body_bonus_orders_admin,
-    #                      args=(worksheet3, body_format, data['bonus_orders'], data['first_period'].strftime("%d.%m.%Y"),
-    #                            data['end_period'].strftime("%d.%m.%Y")))
-    # b.start()
-    # threads.append(b)
-    #
-    # u = threading.Thread(target=body_clients_admin,
-    #                      args=(worksheet6, body_format, users, data['first_period'].strftime("%d.%m.%Y"),
-    #                            data['end_period'].strftime("%d.%m.%Y")))
-    # u.start()
-    # threads.append(u)
-    #
-    # i = threading.Thread(target=body_indicators_admin, args=(worksheet1, body_format, data['indicators'],
-    #                                                          data['bonus_indicators'], data['indicators_by_loc'],
-    #                                                          data['bonus_indicators_by_loc']))
-    # i.start()
-    # threads.append(i)
-    #
-    # s = threading.Thread(target=body_sellers_admin,
-    #                      args=(worksheet4, body_format, sellers, data['first_period'].strftime("%d.%m.%Y"),
-    #                            data['end_period'].strftime("%d.%m.%Y")))
-    # s.start()
-    # threads.append(s)
-    #
-    # c = threading.Thread(target=body_couriers_admin,
-    #                      args=(worksheet5, body_format, data['couriers_orders'],
-    #                            data['first_period'].strftime("%d.%m.%Y"),
-    #                            data['end_period'].strftime("%d.%m.%Y")))
-    # c.start()
-    # threads.append(c)
-    #
-    # head_indicators_admin(worksheet1, head_format, body_format)
-    # head_orders_admin(worksheet2, head_format)
-    # head_bonus_orders_admin(worksheet3, head_format)
-    # head_sellers_admin(worksheet4, head_format)
-    # head_couriers_admin(worksheet5, head_format)
-    # head_clients_admin(worksheet6, head_format)
+    o = threading.Thread(target=body_delivery_orders_admin, args=(worksheet2, body_format, orders,
+                                                                  data['first_period'].strftime("%d.%m.%Y"),
+                                                                  data['end_period'].strftime("%d.%m.%Y")))
+    o.start()
+    threads.append(o)
 
-    # for x in threads:
-    #     x.join()
+    u = threading.Thread(target=body_delivery_clients_admin,
+                         args=(worksheet5, body_format, data['user_orders'], data['first_period'].strftime("%d.%m.%Y"),
+                               data['end_period'].strftime("%d.%m.%Y")))
+    u.start()
+    threads.append(u)
+
+    i = threading.Thread(target=body_delivery_indicators_admin, args=(worksheet1, body_format, data['indicators'],
+                                                                      data['indicators_by_loc']))
+    i.start()
+    threads.append(i)
+
+    s = threading.Thread(target=body_delivery_sellers_admin,
+                         args=(
+                         worksheet3, body_format, data["sellers_orders"], data['first_period'].strftime("%d.%m.%Y"),
+                         data['end_period'].strftime("%d.%m.%Y")))
+    s.start()
+    threads.append(s)
+
+    c = threading.Thread(target=body_delivery_couriers,
+                         args=(worksheet4, body_format, data['couriers_orders'],
+                               data['first_period'].strftime("%d.%m.%Y"),
+                               data['end_period'].strftime("%d.%m.%Y")))
+    c.start()
+    threads.append(c)
+
+    head_delivery_indicators_admin(worksheet1, head_format, body_format)
+    head_delivery_orders_admin(worksheet2, head_format)
+    head_delivery_sellers_admin(worksheet3, head_format)
+    head_delivery_couriers(worksheet4, head_format)
+    head_delivery_clients_admin(worksheet5, head_format)
+
+    for x in threads:
+        x.join()
 
     workbook.close()
-    #
-    # try:
-    #     send_email(data['file_name'], data['file_name'], data['to_email'], data['path'], data['file_name'])
-    #
-    #     os.remove(data['path'])
-    #     return True
-    # except Exception as err:
-    #     os.remove(data['path'])
-    #     logging.error(err)
-    #     return False
+
+    try:
+        send_email(data['file_name'], data['file_name'], data['to_email'], data['path'], data['file_name'])
+
+        os.remove(data['path'])
+        return True
+    except Exception as err:
+        os.remove(data['path'])
+        logging.error(err)
+        return False

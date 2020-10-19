@@ -98,13 +98,27 @@ statistics_date_data = CallbackData('st_date', 'period')
 
 statistics_date_delivery = CallbackData('st_date_del', 'period')
 
+statistics_date_location_delivery = CallbackData('st_date_loc_del', 'period', 'location_id', 'admin')
+
 admin_statistics_date_data_all = CallbackData('st_admin_date', 'period')
 
 statistics_year_data = CallbackData('year_data', 'year')
 
+statistics_year_location_data = CallbackData('year_data_loc', 'year', 'location_id', 'admin')
+
+statistics_delivery_year_data = CallbackData('year_data_del', 'year')
+
 statistics_year_month_data = CallbackData('year_month', 'year', 'month')
 
+statistics_delivery_year_month_data = CallbackData('year_month_del', 'year', 'month')
+
+statistics_delivery_year_month_loc_data = CallbackData('y_m_d_loc', 'year', 'month', 'location_id', 'admin')
+
 statistics_day_data = CallbackData('day_data', 'day', 'month', 'year')
+
+statistics_delivery_day_data = CallbackData('day_del_data', 'day', 'month', 'year')
+
+statistics_delivery_day_loc_data = CallbackData('day_del_data', 'day', 'month', 'year', 'location_id', 'admin')
 
 courier_confirm_data = CallbackData('del_cour', 'status', 'courier_id', 'order_id')
 

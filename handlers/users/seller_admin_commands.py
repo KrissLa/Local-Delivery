@@ -8,7 +8,8 @@ from aiogram.dispatcher import FSMContext
 from filters.users_filters import IsSellerAdminMessage, SellerAdminHasLocationMessage
 from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_keyboard_with_delivery_categories, \
     generate_keyboard_with_none_categories, generate_keyboard_with_categories_for_add_item
-from keyboards.inline.statistics_keyboards import period_markup
+from keyboards.inline.statistics_keyboards import period_markup, generate_locations_keyboard_del, \
+    generate_delivery_period_keyboard
 from loader import dp, db, bot
 from states.seller_admin_states import SellerAdmin
 from utils.check_states import states_for_menu, reset_state
@@ -222,8 +223,16 @@ async def get_statistics(message: types.Message, state: FSMContext):
             ' email адрес - /update_email')
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['gen_orders'], state='*')
-async def get_report(message: types.Message):
-    """Получаем статистику"""
-    await generate_table()
+@dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['get_delivery_statistics'], state='*')
+async def get_statistics(message: types.Message, state: FSMContext):
+    """Получить статистику"""
+    await reset_state(state, message)
+    if await db.get_email_seller(message.from_user.id):
+        location_id = await db.get_seller_admin_location(message.from_user.id)
+        await message.answer('Выберите локацию, по которой хотите получить статистику',
+                             reply_markup=await generate_delivery_period_keyboard(location_id, admin=False))
 
+    else:
+        await message.answer(
+            f'{warning_em} Статистика будет отправлена на email. Чтобы получить статистику Вам сначала нужно ввести'
+            ' email адрес - /update_email')
