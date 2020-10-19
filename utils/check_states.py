@@ -193,4 +193,5 @@ async def reset_state(state, message):
                                      'Menu:WaitAddress']:
         await state.finish()
         order_id = await db.get_last_order_id(message.from_user.id)
-        await db.delete_order_by_id(order_id)
+        if order_id:
+            await db.delete_order_by_id(order_id)
