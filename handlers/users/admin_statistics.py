@@ -88,10 +88,16 @@ async def get_all_statistics(call: CallbackQuery):
     except Exception as err:
         logging.error(err)
 
+    first_day = await db.get_first_order_date_admin()
+    if first_day:
+        first_period = first_day
+    else:
+        first_period = datetime.now(timezone("Europe/Moscow"))
+
     data = {
         'user_id': call.from_user.id,
         'to_email': email,
-        'first_period': await db.get_first_order_date_admin(),
+        'first_period': first_period,
         'end_period': datetime.now(timezone("Europe/Moscow")),
 
         'path_to_dir': path_to_dir,

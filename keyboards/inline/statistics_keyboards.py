@@ -11,6 +11,9 @@ months_names = ['', 'Январь', 'Февраль', 'Март', 'Апрель'
 all_locations_button = InlineKeyboardButton(text='Все локации',
                                             callback_data=statistics_location_data.new(location_id='all_locations'))
 
+all_delivery_locations_button = InlineKeyboardButton(text='Все локации',
+                                            callback_data=statistics_location_data_del.new(location_id='all_locations'))
+
 
 async def generate_locations_keyboard(locations, page=0):
     if len(locations) < 11:
@@ -42,7 +45,7 @@ async def generate_locations_keyboard_del(locations, page=0):
     if len(locations) < 11:
         keyboard = InlineKeyboardMarkup()
         if page == 0:
-            keyboard.add(all_locations_button)
+            keyboard.add(all_delivery_locations_button)
         for location in locations:
             button = InlineKeyboardButton(
                 text=location['location_name'],

@@ -3531,18 +3531,15 @@ order by order_id;""")]
     where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
     order by order_id;""")]
 
-    async def get_delivery_orders(self):
+    async def get_delivery_orders_stat(self):
         """"""
         return [dict(order) for order in await self.pool.fetch(f"""
-        select order_id, order_user_id, order_seller_id, order_courier_id, order_date, order_created_at, order_accepted_at, 
-        order_canceled_at, order_time_for_delivery, order_delivered_at, order_deliver_through,
-        order_final_price, order_delivery_method, order_status, order_review, order_reason_for_rejection, local_object_name, 
-        location_name
-        from orders 
-        join local_objects on local_object_id = order_local_object_id
-    	join locations on local_object_location_id = location_id
-        where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
-        order by order_id;""")]
+        select location_name, delivery_order_id, delivery_order_seller_admin_id, delivery_order_admin_id, delivery_order_courier_id, delivery_order_created_at, 
+		delivery_order_canceled_at, delivery_order_changed_at, delivery_order_delivered_at, delivery_order_day_for_delivery, delivery_order_time_info, 
+		delivery_order_final_price, delivery_order_status
+        from delivery_orders 
+		join locations on delivery_order_location_id = location_id
+        order by delivery_order_id;""")]
 
     async def get_orders_by_date(self, first_day, last_day):
         """"""
@@ -3580,6 +3577,15 @@ order by order_id;""")]
     where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
     group by order_id
     order by order_id;""")
+
+    async def get_delivery_orders_count_admin(self):
+        """"""
+        return await self.pool.fetch(f"""
+    select delivery_order_id, count(dop_order_id) as count
+    from delivery_orders 
+    join delivery_order_products on delivery_order_id = dop_order_id
+    group by delivery_order_id
+    order by delivery_order_id;""")
 
     async def get_orders_count_admin_by_date(self, first_day, last_day):
         """"""
@@ -3624,6 +3630,12 @@ order by order_id;""")
     join order_products on order_id = op_order_id
     where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
     order by  order_id;""")
+
+    async def get_delivery_order_products_admin(self):
+        return await self.pool.fetch(f"""select dop_order_id, dop_product_name, dop_quantity, dop_price_per_unit
+    from delivery_orders 
+    join delivery_order_products on delivery_order_id = dop_order_id
+    order by  delivery_order_id;""")
 
     async def get_order_products_admin_by_date(self, first_day, last_day):
         return await self.pool.fetch(f"""select op_order_id, op_product_name, op_quantity, op_price_per_unit
@@ -3827,6 +3839,30 @@ and order_status in ('Выполнен', 'Отклонен продавцом', 
 from orders
 where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')""")
 
+    async def get_delivery_indicators(self):
+        return await self.pool.fetchrow(f"""
+        select DISTINCT 
+    COUNT(*) FILTER (WHERE delivery_order_status = 'Заказ выполнен') as completed,   
+    SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status = 'Заказ выполнен') as completed_price,
+   
+    COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен поставщиком') as canceled_by_seller,   
+    SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status = 'Отменен поставщиком') as canceled_by_seller_price,
+
+    COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен клиентом') as canceled_by_client,   
+    SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status = 'Отменен клиентом') as canceled_by_client_price,
+   
+    COUNT(*) FILTER (WHERE delivery_order_status in ('Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')) as waitings,	
+	SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status in ('Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')) as waitings_price,
+	
+	COUNT(*) FILTER (WHERE delivery_order_status = 'Ожидание подтверждения') as wait_confirm,	
+	SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status = 'Ожидание подтверждения') as wait_confirm_price,
+	
+	COUNT(*) as all_orders,
+	SUM(delivery_order_final_price) as all_orders_price
+
+
+from delivery_orders""")
+
     async def get_indicators_by_date(self, first_day, last_day):
         return await self.pool.fetchrow(f"""
         select DISTINCT 
@@ -3876,6 +3912,33 @@ join locations on local_object_location_id = location_id
 where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
 group by location_id, location_name
 order by location_id""")
+
+    async def get_admin_delivery_indicators_by_loc(self):
+        return await self.pool.fetch(f"""
+            select DISTINCT location_id, location_name,
+        COUNT(*) FILTER (WHERE delivery_order_status = 'Заказ выполнен') as completed,   
+    SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status = 'Заказ выполнен') as completed_price,
+   
+    COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен поставщиком') as canceled_by_seller,   
+    SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status = 'Отменен поставщиком') as canceled_by_seller_price,
+
+    COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен клиентом') as canceled_by_client,   
+    SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status = 'Отменен клиентом') as canceled_by_client_price,
+   
+    COUNT(*) FILTER (WHERE delivery_order_status in ('Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')) as waitings,	
+	SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status in ('Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')) as waitings_price,
+	
+	COUNT(*) FILTER (WHERE delivery_order_status = 'Ожидание подтверждения') as wait_confirm,	
+	SUM(delivery_order_final_price) FILTER (WHERE delivery_order_status = 'Ожидание подтверждения') as wait_confirm_price,
+	
+	COUNT(*) as all_orders,
+	SUM(delivery_order_final_price) as all_orders_price
+
+
+    from delivery_orders
+    join locations on delivery_order_location_id = location_id
+    group by location_id, location_name
+    order by location_id""")
 
     async def get_admin_indicators_by_loc_date(self, first_day, last_day):
         return await self.pool.fetch(f"""
@@ -4163,6 +4226,22 @@ where order_status in ('Выполнен', 'Отклонен продавцом'
 group by seller_telegram_id, order_seller_id, seller_name, location_name
 order by order_seller_id""")]
 
+    async def get_sellers_delivery_orders_admin(self):
+        """Получаем id продавцов"""
+        return [dict(order) for order in await self.pool.fetch(f"""
+        select distinct delivery_order_admin_id, admin_telegram_id, admin_name, 
+count(*) as all_orders,
+ COUNT(*) FILTER (WHERE delivery_order_status = 'Заказ выполнен') as completed,
+COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен поставщиком') as canceled_by_seller, 
+COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен клиентом') as canceled_by_client, 
+COUNT(*) FILTER (WHERE delivery_order_status in ('Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')) as waitings
+
+from delivery_orders
+join admins on delivery_order_admin_id = admin_id
+where delivery_order_status in ('Заказ выполнен', 'Отменен поставщиком', 'Отменен клиентом', 'Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')
+group by admin_telegram_id, delivery_order_admin_id, admin_name
+order by delivery_order_admin_id""")]
+
     async def get_sellers_orders_admin_by_date(self, first_day, last_day):
         """Получаем id продавцов"""
         return [dict(order) for order in await self.pool.fetch(f"""
@@ -4237,6 +4316,23 @@ where order_status in ('Выполнен', 'Отклонен продавцом'
 group by order_user_id, user_telegram_id, location_name
 order by order_user_id""")]
 
+    async def get_users_delivery_orders_admin(self):
+        """Получаем id продавцов"""
+        return [dict(order) for order in await self.pool.fetch(f"""
+            select distinct delivery_order_seller_admin_id, admin_seller_telegram_id, admin_seller_name, location_name,
+count(*) as all_orders,
+ COUNT(*) FILTER (WHERE delivery_order_status = 'Заказ выполнен') as completed,
+COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен поставщиком') as canceled_by_seller, 
+COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен клиентом') as canceled_by_client, 
+COUNT(*) FILTER (WHERE delivery_order_status in ('Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')) as waitings,
+COUNT(*) FILTER (WHERE delivery_order_status = 'Ожидание подтверждения') as wait_confirm
+
+from delivery_orders
+join admin_sellers on delivery_order_seller_admin_id = admin_seller_id
+join locations on admin_seller_location_id = location_id
+group by delivery_order_seller_admin_id, admin_seller_telegram_id, admin_seller_name, location_name
+order by delivery_order_seller_admin_id""")]
+
     async def get_users_orders_admin_by_date(self, first_day, last_day):
         """Получаем id продавцов"""
         return [dict(order) for order in await self.pool.fetch(f"""
@@ -4310,6 +4406,22 @@ join locations on location_id = courier_location_id
 where order_status in ('Выполнен', 'Отклонен продавцом', 'Отменен пользователем', 'Отменен курьером')
 group by order_courier_id, courier_telegram_id, courier_name, location_name
 order by order_courier_id""")]
+
+        async def get_couriers_delivery_orders_admin(self):
+            """Получаем id продавцов"""
+            return [dict(order) for order in await self.pool.fetch(f"""
+            select distinct delivery_order_courier_id, delivery_courier_telegram_id, delivery_courier_name,
+count(*) as all_orders,
+ COUNT(*) FILTER (WHERE delivery_order_status = 'Заказ выполнен') as completed,
+COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен поставщиком') as canceled_by_seller, 
+COUNT(*) FILTER (WHERE delivery_order_status = 'Отменен клиентом') as canceled_by_client, 
+COUNT(*) FILTER (WHERE delivery_order_status in ('Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')) as waitings
+
+from delivery_orders
+join delivery_couriers on delivery_order_courier_id = delivery_courier_id
+where delivery_order_status in ('Заказ выполнен', 'Отменен поставщиком', 'Отменен клиентом', 'Ожидание подтверждения курьером', 'Заказ подтвержден', 'Курьер не назначен')
+group by delivery_order_courier_id, delivery_courier_telegram_id, delivery_courier_name
+order by delivery_order_courier_id""")]
 
     async def get_couriers_orders_admin_by_date(self, first_day, last_day):
         """Получаем id продавцов"""

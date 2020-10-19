@@ -48,25 +48,19 @@ async def get_all_statistics(call: CallbackQuery):
         'file_name': file_name,
         'path': f'{path_to_dir}/{file_name}.xlsx',
 
-        'orders': await db.get_orders(),
-        'products': list(await db.get_order_products_admin()),
-        'numbers': await db.get_orders_count_admin(),
+        'orders': await db.get_delivery_orders_stat(),
+        'products': list(await db.get_delivery_order_products_admin()),
+        'numbers': await db.get_delivery_orders_count_admin(),
 
-        'indicators': await db.get_indicators(),
-        'bonus_indicators': await db.get_bonus_indicators_admin(),
-        'indicators_by_loc': await db.get_admin_indicators_by_loc(),
-        'bonus_indicators_by_loc': await db.get_bonus_indicators_admin_by_loc(),
+        'indicators': await db.get_delivery_indicators(),
+        'indicators_by_loc': await db.get_admin_delivery_indicators_by_loc(),
 
-        'bonus_orders': await db.get_bonus_orders(),
+        'sellers_orders': await db.get_sellers_delivery_orders_admin(),
 
-        'sellers_orders': await db.get_sellers_orders_admin(),
-        'sellers_bonus': await db.get_sellers_bonus_orders_admin(),
+        'couriers_orders': await db.get_couriers_delivery_orders_admin(),
 
-        'couriers_orders': await db.get_couriers_orders_admin(),
-
-        'user_orders': await db.get_users_orders_admin(),
-        'user_bonus_orders': await db.get_users_bonus_orders_admin(),
+        'user_orders': await db.get_users_delivery_orders_admin()
 
     }
 
-    await send_admin_statistics(data)
+    await send_admin_delivery_statistics(data)

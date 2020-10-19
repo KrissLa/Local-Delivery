@@ -68,11 +68,16 @@ async def get_statistics(call: CallbackQuery, state: FSMContext):
         os.makedirs(f"{path_to_dir}")
     except Exception as err:
         logging.error(err)
+    first_day = await db.get_first_order_date(location['location_id'])
+    if first_day:
+        first_period = first_day
+    else:
+        first_period = datetime.now(timezone("Europe/Moscow"))
 
     data = {
         'user_id': call.from_user.id,
         'to_email': email,
-        'first_period': await db.get_first_order_date(location['location_id']),
+        'first_period': first_period,
         'end_period': datetime.now(timezone("Europe/Moscow")),
 
         'path_to_dir': path_to_dir,

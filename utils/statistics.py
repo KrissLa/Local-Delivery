@@ -33,6 +33,21 @@ async def send_admin_statistics(data):
                                f" Проверьте e-mail адрес и попробуйте еще раз.")
 
 
+async def send_admin_delivery_statistics(data):
+    """Собираем и отправляем статистику админу"""
+
+    loop = asyncio.get_running_loop()
+
+    mail_was_send = await loop.run_in_executor(
+        None, write_admin_delivery_statistics, data)
+    if mail_was_send:
+        await bot.send_message(data['user_id'], f"{success_em} Статистика по оптовым заказам отправлена Вам на почту {data['to_email']}.")
+    else:
+        await bot.send_message(data['user_id'],
+                               f"{error_em} Не удалось отправить статистику по адресу {data['to_email']}."
+                               f" Проверьте e-mail адрес и попробуйте еще раз.")
+
+
 h_format = {
     'bold': True,
     'border': 2,
@@ -1345,3 +1360,85 @@ def write_admin_statistics(data):
         os.remove(data['path'])
         logging.error(err)
         return False
+
+
+
+def write_admin_delivery_statistics(data):
+    """Записываем статистику"""
+    # orders = get_orders(data['orders'], data['products'], data['numbers'])
+    #
+    # users = get_users_indicators(data['user_orders'], data['user_bonus_orders'])
+    #
+    # sellers = get_sellers_indicators(data['sellers_orders'], data['sellers_bonus'])
+    #
+    # threads = []
+
+    workbook = xlsxwriter.Workbook(data['path'])
+
+    body_format = workbook.add_format(b_format)
+    head_format = workbook.add_format(h_format)
+
+    worksheet1 = workbook.add_worksheet('Показатели за период')
+    worksheet2 = workbook.add_worksheet('Статистика заказов')
+    worksheet3 = workbook.add_worksheet('Поставщики')
+    worksheet4 = workbook.add_worksheet('Курьеры')
+    worksheet5 = workbook.add_worksheet('Заказчики')
+
+    # o = threading.Thread(target=body_orders_admin, args=(worksheet2, body_format, orders,
+    #                                                      data['first_period'].strftime("%d.%m.%Y"),
+    #                                                      data['end_period'].strftime("%d.%m.%Y")))
+    # o.start()
+    # threads.append(o)
+    #
+    # b = threading.Thread(target=body_bonus_orders_admin,
+    #                      args=(worksheet3, body_format, data['bonus_orders'], data['first_period'].strftime("%d.%m.%Y"),
+    #                            data['end_period'].strftime("%d.%m.%Y")))
+    # b.start()
+    # threads.append(b)
+    #
+    # u = threading.Thread(target=body_clients_admin,
+    #                      args=(worksheet6, body_format, users, data['first_period'].strftime("%d.%m.%Y"),
+    #                            data['end_period'].strftime("%d.%m.%Y")))
+    # u.start()
+    # threads.append(u)
+    #
+    # i = threading.Thread(target=body_indicators_admin, args=(worksheet1, body_format, data['indicators'],
+    #                                                          data['bonus_indicators'], data['indicators_by_loc'],
+    #                                                          data['bonus_indicators_by_loc']))
+    # i.start()
+    # threads.append(i)
+    #
+    # s = threading.Thread(target=body_sellers_admin,
+    #                      args=(worksheet4, body_format, sellers, data['first_period'].strftime("%d.%m.%Y"),
+    #                            data['end_period'].strftime("%d.%m.%Y")))
+    # s.start()
+    # threads.append(s)
+    #
+    # c = threading.Thread(target=body_couriers_admin,
+    #                      args=(worksheet5, body_format, data['couriers_orders'],
+    #                            data['first_period'].strftime("%d.%m.%Y"),
+    #                            data['end_period'].strftime("%d.%m.%Y")))
+    # c.start()
+    # threads.append(c)
+    #
+    # head_indicators_admin(worksheet1, head_format, body_format)
+    # head_orders_admin(worksheet2, head_format)
+    # head_bonus_orders_admin(worksheet3, head_format)
+    # head_sellers_admin(worksheet4, head_format)
+    # head_couriers_admin(worksheet5, head_format)
+    # head_clients_admin(worksheet6, head_format)
+
+    # for x in threads:
+    #     x.join()
+
+    workbook.close()
+    #
+    # try:
+    #     send_email(data['file_name'], data['file_name'], data['to_email'], data['path'], data['file_name'])
+    #
+    #     os.remove(data['path'])
+    #     return True
+    # except Exception as err:
+    #     os.remove(data['path'])
+    #     logging.error(err)
+    #     return False
