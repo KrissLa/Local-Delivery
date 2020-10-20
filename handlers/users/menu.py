@@ -508,7 +508,7 @@ async def get_reason(message: types.Message, state: FSMContext):
     await state.finish()
 
 
-@dp.callback_query_handler(reviev_order_data.filter())
+@dp.callback_query_handler(reviev_order_data.filter(), state='*')
 async def get_review(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Просим написать отзыв"""
     order_id = int(callback_data.get('order_id'))
