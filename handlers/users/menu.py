@@ -289,6 +289,7 @@ async def set_delivery(call: CallbackQuery, state: FSMContext):
                                       'Пример 1: Подъезд 2, 15 этаж, офис 123, ООО Компания, ФИО покупателя, 89160000000\n\n'
                                       'Пример 2: Северный вход, у ресепшн, 89160000000.',
                                       reply_markup=order_cancel_or_back_markup)
+            await Menu.WaitNewAddress.set()
         else:
             await state.update_data(address=user_data['user_address'])
             await call.message.answer(f"Использовать адрес предыдущего заказа?\n{user_data['user_address']}",
@@ -309,7 +310,7 @@ async def set_delivery(call: CallbackQuery, state: FSMContext):
                                               back_button
                                           ]
                                       ]))
-        await Menu.WaitAddress.set()
+            await Menu.WaitAddress.set()
     else:
         await call.message.edit_reply_markup()
         await call.message.answer(f'{warning_em} Для заказа Вам нужно выбрать хотя бы один товар. Выберите что-то из'

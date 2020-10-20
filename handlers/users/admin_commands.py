@@ -74,7 +74,7 @@ async def remove_item_from_stock(message: types.Message, state: FSMContext):
 async def remove_item(message: types.Message, state: FSMContext):
     """Удаление товара"""
     await reset_state(state, message)
-    categories = await db.get_list_of_delivery_categories_with_items()
+    categories = await db.get_delivery_categories_with_products()
     await message.answer('Выберите категорию, из которой нужно удалить товар',
                          reply_markup=await generate_keyboard_with_delivery_categories_for_add_item(categories))
     await AddAdmin.RemoveDeliveryItemCat.set()
@@ -279,7 +279,7 @@ async def add_delivery_category(message: types.Message, state: FSMContext):
 async def add_delivery_item(message: types.Message, state: FSMContext):
     """Добавление товара"""
     await reset_state(state, message)
-    categories = await db.get_list_of_delivery_categories()
+    categories = await db.get_delivery_category_list()
     if categories:
         await message.answer("Выберите категорию",
                              reply_markup=await generate_keyboard_with_delivery_categories_for_add_item(categories))
@@ -462,7 +462,7 @@ async def remove_category(message: types.Message, state: FSMContext):
 async def add_item(message: types.Message, state: FSMContext):
     """Добавить товар"""
     await reset_state(state, message)
-    categories = await db.get_list_of_categories()
+    categories = await db.get_category_list()
     if categories:
         await message.answer("Выберите категорию",
                              reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
@@ -786,7 +786,7 @@ async def edit_metro(message: types.Message, state: FSMContext):
 async def edit_item(message: types.Message, state: FSMContext):
     """Изменяем товар"""
     await reset_state(state, message)
-    categories = await db.get_categories_with_products()
+    categories = await db.get_list_of_categories_with_items()
     await message.answer('Выберите категорию, в которой находится товар.',
                          reply_markup=await generate_keyboard_with_categories_for_add_item(categories))
     await AddAdmin.EditItem.set()

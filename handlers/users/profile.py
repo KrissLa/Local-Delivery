@@ -2,6 +2,7 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
+from filters.users_filters import IsNotClientCallback, IsNotClientMessage
 from keyboards.inline.callback_datas import metro_data, local_object_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_metro_profile, get_available_local_objects_profile
 from loader import dp, db
@@ -96,6 +97,33 @@ async def get_user_address(call: CallbackQuery, callback_data: dict, state: FSMC
     await ProfileState.WaitAddress.set()
 
 
+@dp.callback_query_handler(IsNotClientCallback(), text='address_later', state=ProfileState.WaitAddress)
+async def set_change_profile_without_address(call: CallbackQuery, state: FSMContext):
+    """Обновляем данные профиля без адреса"""
+    data = await state.get_data()
+    local_object_id = data.get('local_object_id')
+    loc_data = await db.get_local_object_data_by_id(local_object_id)
+    await db.add_user(call.from_user.id,
+                      loc_data['local_object_metro_id'],
+                      loc_data['local_object_location_id'],
+                      local_object_id
+                      )
+    await call.message.answer("Данные профиля обновлены.\n"
+                              f"User ID: {call.from_user.id}\n"
+                              f"Адрес доставки: {loc_data['local_object_name']}\n"
+                              f"Параметры доставки: Не указаны\n",
+                              reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                  [
+                                      InlineKeyboardButton(
+                                          text='Изменить',
+                                          callback_data='change_profile'
+                                      )
+                                  ]
+                              ]
+                              ))
+    await state.finish()
+
+
 @dp.callback_query_handler(text='address_later', state=ProfileState.WaitAddress)
 async def set_change_profile_without_address(call: CallbackQuery, state: FSMContext):
     """Обновляем данные профиля без адреса"""
@@ -121,6 +149,9 @@ async def set_change_profile_without_address(call: CallbackQuery, state: FSMCont
                               ]
                               ))
     await state.finish()
+
+
+
 
 
 @dp.message_handler(state=ProfileState.WaitAddress)

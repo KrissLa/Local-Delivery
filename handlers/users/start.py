@@ -49,6 +49,7 @@ async def bot_start_referal(message: types.Message, state: FSMContext):
             await SignUpUser.Metro.set()
 
 
+@dp.message_handler(IsNotClientMessage(), state=['*'])
 @dp.message_handler(HasNoMetro(), IsNotClientMessage(), state=['*'])
 @dp.message_handler(HasNoLocation(), IsNotClientMessage(), state=['*'])
 @dp.message_handler(HasNoLocalObject(), IsNotClientMessage(), state=['*'])
@@ -93,7 +94,11 @@ async def set_user_location(call: CallbackQuery, callback_data: dict, state: FSM
     """Сохраняем данные в бд. Отправляем меню"""
     await call.answer(text='Локация выбрана', cache_time=10)
     data = await state.get_data()
-    inviter_id = data.get('inviter_id')
+    try:
+        inviter_id = data.get('inviter_id')
+    except Exception as err:
+        logging.info(err)
+        inviter_id = None
     await call.message.edit_reply_markup()
     local_object_id = int(callback_data.get('local_object_id'))
     loc_data = await db.get_local_object_data_by_id(local_object_id)

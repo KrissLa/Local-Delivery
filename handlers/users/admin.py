@@ -1738,7 +1738,7 @@ async def get_metro_id(call: CallbackQuery, callback_data: dict, state: FSMConte
     await call.message.edit_reply_markup()
     metro_id = int(callback_data.get('metro_id'))
     await state.update_data(metro_id=metro_id)
-    metro_name = await db.get_metro_name_by_location_metro_id(metro_id)
+    metro_name = await db.get_metro_name_by_id(metro_id)
     await call.message.answer(f'{metro_name}\n'
                               'Введите новое название станции метро:\n',
                               reply_markup=cancel_admin_markup)

@@ -86,9 +86,11 @@ async def take_order_confirm(call: CallbackQuery, state: FSMContext, callback_da
 async def get_courier(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Отправка сообщения курьеру"""
     await call.message.edit_reply_markup()
+    cour_tg = int(callback_data['delivery_courier_telegram_id'])
     order = await db.get_delivery_order_data(int(callback_data['order_id']))
+    cour_name = await db.get_delivery_courier_name(cour_tg)
     try:
-        await bot.send_message(int(callback_data['delivery_courier_telegram_id']),
+        await bot.send_message(cour_tg,
                                f'Вам назначен новый заказ № {order["delivery_order_id"]}\n'
                                f'{await get_delivery_product_list(int(callback_data["order_id"]))}'
                                f'Сумма заказа: {order["delivery_order_final_price"]} руб.\n'
@@ -102,10 +104,12 @@ async def get_courier(call: CallbackQuery, callback_data: dict, state: FSMContex
         await db.update_delivery_order_courier_and_status(int(callback_data['order_id']),
                                                           int(callback_data['delivery_courier_id']),
                                                           'Ожидание подтверждения курьером')
-        await call.message.answer(f"{success_em} Уведомление курьеру отправлено.")
+
+
+        await call.message.answer(f"{success_em} Уведомление курьеру {cour_name} отправлено.")
     except Exception as err:
         logging.error(err)
-        await call.message.answer("Не удалось отправить сообщение курьеру")
+        await call.message.answer(f"Не удалось отправить сообщение курьеру {cour_name}")
     await state.finish()
 
 
@@ -118,7 +122,6 @@ async def take_order_cancel(call: CallbackQuery, callback_data: dict, state: FSM
     await state.update_data(order_id=order_id)
     status = await db.get_delivery_order_status(order_id)
     delivery_info = await db.get_delivery_admin_id(order_id)
-    # admin_id = await db.get_admin_id(call.from_user.id)
     if status == 'Ожидание подтверждения' and delivery_info['delivery_order_admin_id'] is None:
         await call.message.answer("Вы уверены что хотите отклонить заказ?",
                                   reply_markup=confirm_cancel_delivery)
@@ -137,7 +140,6 @@ async def cancel_order(call: CallbackQuery, state: FSMContext):
     order_owner = await db.get_delivery_order_owner(order_id)
     status = await db.get_delivery_order_status(order_id)
     delivery_info = await db.get_delivery_admin_id(order_id)
-    # admin_id = await db.get_admin_id(call.from_user.id)
     if status == 'Ожидание подтверждения' and delivery_info['delivery_order_admin_id'] is None:
         try:
             await db.update_delivery_order_status(order_id, 'Отменен поставщиком', True)

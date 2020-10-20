@@ -415,7 +415,7 @@ async def confirm_delivery_order(call: CallbackQuery, state: FSMContext):
 
 ###############
 
-@dp.message_handler(state=SellerAdmin.ChangeOrder, regexp="change_delivery_order_by_id_\d+")
+@dp.message_handler(regexp="change_delivery_order_by_id_\d+")
 async def get_delivery_order_info(message: types.Message, state: FSMContext):
     """Изменяем размер по id"""
     delivery_order_id = int(message.text.split('_')[-1])
@@ -465,13 +465,11 @@ async def back(call: CallbackQuery):
     """Назад к списку"""
     delivery_orders = await db.get_delivery_orders(call.from_user.id)
     if delivery_orders:
-        await call.message.answer(await get_list_of_delivery_orders(delivery_orders),
-                                  reply_markup=cancel_admin_markup)
+        await call.message.answer(await get_list_of_delivery_orders(delivery_orders))
 
     else:
         await call.message.answer('Нет активных заказов',
                                   reply_markup=cancel_admin_markup)
-    await SellerAdmin.ChangeOrder.set()
 
 
 @dp.callback_query_handler(text='back', state=[SellerAdmin.ChangeDeliveryTime,

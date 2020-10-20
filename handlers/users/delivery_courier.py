@@ -12,13 +12,14 @@ from utils.emoji import success_em, error_em, warning_em
 async def get_courier(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Курьер принимает заказ"""
     await call.message.edit_reply_markup()
+    cour_name = await db.get_delivery_courier_name(call.from_user.id)
     await db.update_delivery_order_status(int(callback_data["order_id"]),
                                           'Заказ подтвержден')
     await call.message.answer(f"{success_em}, Готово.\n"
                               f"Заказ № {int(callback_data['order_id'])} принят.\n"
                               f"{warning_em} Подтвердить доставку /confirm_delivery_order")
     admin = await db.get_delivery_admin_tg_id(int(callback_data["order_id"]))
-    await bot.send_message(admin, f"{success_em} Курьер принял заказ № {int(callback_data['order_id'])}")
+    await bot.send_message(admin, f"{success_em} Курьер {cour_name} принял заказ № {int(callback_data['order_id'])}")
 
 
 @dp.callback_query_handler(courier_confirm_data.filter(status='cancel'))

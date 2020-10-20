@@ -87,7 +87,8 @@ async def bot_help(message: types.Message, state: FSMContext):
 
         'Статистика:',
         '54. Получить статистику - /get_statistics',
-        '54. Добавить/изменить email адрес для получения статистики - /update_email',
+        '55. Получить статистику по оптовым заказам - /get_delivery_statistics',
+        '56. Добавить/изменить email адрес для получения статистики - /update_email',
     ]
     await message.answer('\n'.join(text))
 
@@ -120,7 +121,8 @@ async def bot_help(message: types.Message, state: FSMContext):
         '15. Посмотреть/изменить/отменить заказы на поставку - /change_delivery_order\n',
         'Статистика:',
         '16. Получить статистику - /get_statistics',
-        '17. Добавить/изменить email адрес для получения статистики - /update_email',
+        '17. Получить статистику по оптовым заказам - /get_delivery_statistics',
+        '18. Добавить/изменить email адрес для получения статистики - /update_email',
     ]
     await message.answer('\n'.join(text))
 

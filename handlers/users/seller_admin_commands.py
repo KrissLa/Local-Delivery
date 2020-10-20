@@ -27,13 +27,10 @@ async def get_active_delivery_orders(message: types.Message, state: FSMContext):
     await reset_state(state, message)
     delivery_orders = await db.get_delivery_orders(message.from_user.id)
     if delivery_orders:
-        await message.answer(await get_list_of_delivery_orders(delivery_orders),
-                             reply_markup=cancel_admin_markup)
+        await message.answer(await get_list_of_delivery_orders(delivery_orders))
 
     else:
-        await message.answer('Нет активных заказов',
-                             reply_markup=cancel_admin_markup)
-    await SellerAdmin.ChangeOrder.set()
+        await message.answer('Нет активных заказов')
 
 
 @dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['new_delivery_order'],
