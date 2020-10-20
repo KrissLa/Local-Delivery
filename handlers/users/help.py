@@ -146,7 +146,7 @@ async def bot_help(message: types.Message, state: FSMContext):
         '8. Все непринятые заказы - /unaccepted_orders',
         '9. Все принятые заказы. Отмечать заказы как готовые здесь - /active_orders',
         '10. Подтверждение выдачи заказа - /confirm_delivery',
-        '11. Бонусные непринятые  заказы -/unaccepted_bonus_orders'
+        '11. Бонусные непринятые  заказы -/unaccepted_bonus_orders',
         '12. Бонусные принятые заказы. Отмечать заказы как готовые здесь - /active_bonus_orders',
         '13. Подтверждение выдачи бонусного заказа - /confirm_bonus_delivery',
     ]
