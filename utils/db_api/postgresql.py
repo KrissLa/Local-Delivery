@@ -20,7 +20,7 @@ class Database:
             user=config.PGUSER,
             database=config.PGDATABASE,
             password=config.PGPASSWORD,
-            host="localhost",
+            host=config.ip,
             port=config.PORT,
             statement_cache_size=0
         )

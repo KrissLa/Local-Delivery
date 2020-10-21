@@ -1,8 +1,8 @@
 version: '3.1'
 
 services:
-  tgbot:
-    container_name: bot
+  local_delivery_bot:
+    container_name: local_delivery_bot
     build:
       context: .
     command: python app.py
@@ -12,8 +12,8 @@ services:
     # bot start after load db
     networks:
       - botnet
-  redis:
-    container_name: redis
+  ld_redis:
+    container_name: ld_redis
     image: redis
     ports:
       - 6379:6379
