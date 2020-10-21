@@ -3,17 +3,16 @@ import logging
 import os
 import smtplib
 import sys
+import threading
 from email import encoders
-from email.header import Header
-from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import formatdate
-import threading
-from data.config import EMAIL_ADDRESS, EMAIL_PASSWORD
 
 import xlsxwriter
 
+from data.config import EMAIL_ADDRESS, EMAIL_PASSWORD
 from loader import bot
 from utils.emoji import success_em, error_em
 
@@ -1787,7 +1786,6 @@ def body_delivery_clients_admin(worksheet, body_format, sellers, start_period, e
         first_string = 4
         num = 1
         for seller in sellers:
-
             ls = first_string + 4
 
             worksheet.merge_range(f'B{first_string}:B{ls}', f'{num}', body_format)
@@ -1847,8 +1845,8 @@ def write_admin_delivery_statistics(data):
 
     s = threading.Thread(target=body_delivery_sellers_admin,
                          args=(
-                         worksheet3, body_format, data["sellers_orders"], data['first_period'].strftime("%d.%m.%Y"),
-                         data['end_period'].strftime("%d.%m.%Y")))
+                             worksheet3, body_format, data["sellers_orders"], data['first_period'].strftime("%d.%m.%Y"),
+                             data['end_period'].strftime("%d.%m.%Y")))
     s.start()
     threads.append(s)
 

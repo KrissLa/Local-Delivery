@@ -1,14 +1,8 @@
-import functools
 import asyncio
-import concurrent.futures
-import concurrent.futures
-import functools
 import logging
 import os
-import threading
 from datetime import datetime, timedelta
 
-import xlsxwriter
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 from pytz import timezone
@@ -16,7 +10,7 @@ from pytz import timezone
 from keyboards.inline.callback_datas import statistics_date_data, statistics_year_data, statistics_year_month_data, \
     statistics_day_data
 from keyboards.inline.statistics_keyboards import gen_years_keyboard, period_markup, gen_months_keyboard, months_names, \
-    gen_days_keyboard, generate_delivery_period_keyboard
+    gen_days_keyboard
 from loader import dp, db, bot
 from states.admin_state import AddAdmin
 from states.seller_admin_states import SellerAdmin
