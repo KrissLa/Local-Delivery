@@ -1,19 +1,6 @@
 version: '3.1'
 
 services:
-  db:
-    container_name: database
-    image: sameersbn/postgresql:10-2
-    env_file:
-      - ".env"
-    restart: always
-    ports:
-      - 5432:5432
-    networks:
-      - botnet
-    volumes:
-      - ./pgdata:/var/lib/postgresql/data
-
   tgbot:
     container_name: bot
     build:
@@ -23,8 +10,6 @@ services:
     env_file:
       - ".env"
     # bot start after load db
-    depends_on:
-      - db
     networks:
       - botnet
   redis:
