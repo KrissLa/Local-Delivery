@@ -86,14 +86,14 @@ class AddAdmin(StatesGroup):
     RemoveCourier = State()
     ResetCourier = State()
 
-    RemoveCategoryFromStocks = State()
-    ReturnCategoryToStocks = State()
+    RemoveCategoryFromStocks = State()  #
+    ReturnCategoryToStocks = State()  #
 
-    ReturnItemToStockCategory = State()
-    ReturnItemToStockProduct = State()
+    ReturnItemToStockCategory = State()  #
+    ReturnItemToStockProduct = State()  #
 
-    RemoveItemFromStockCategory = State()
-    RemoveItemFromStockProduct = State()
+    RemoveItemFromStockCategory = State()  #
+    RemoveItemFromStockProduct = State()  #
 
     ChangeSellerAdmin = State()
     ChangeSellerAdminMetro = State()
@@ -145,15 +145,15 @@ class AddAdmin(StatesGroup):
     RemoveDeliveryItemCat = State()
     RemoveDeliveryItem = State()
 
-    RemoveDeliveryItemFromStockCategory = State()
-    RemoveDeliveryItemFromStockProduct = State()
+    RemoveDeliveryItemFromStockCategory = State()  #
+    RemoveDeliveryItemFromStockProduct = State()  #
 
-    ReturnDeliveryItemToStockCategory = State()
-    ReturnDeliveryItemToStockProduct = State()
+    ReturnDeliveryItemToStockCategory = State()  #
+    ReturnDeliveryItemToStockProduct = State()  #
 
-    EditDeliveryItem = State()
-    EditDeliveryItemPrice = State()
-    EditDeliveryItemID = State()
+    EditDeliveryItem = State()  #
+    EditDeliveryItemPrice = State()  #
+    EditDeliveryItemID = State()  #
 
     DeliveryCourierName = State()
     DeliveryCourierID = State()
@@ -175,5 +175,3 @@ class AddAdmin(StatesGroup):
 
     DeliveryLocMonth = State()
     DeliveryLocDay = State()
-
-

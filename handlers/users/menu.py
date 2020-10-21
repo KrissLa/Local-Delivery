@@ -443,9 +443,7 @@ async def user_confirm_order(call: CallbackQuery, state: FSMContext):
     """Пользователь подтвердил заказ"""
     await call.message.edit_reply_markup()
     order_date = datetime.now(timezone("Europe/Moscow"))
-    # order_id = await db.get_last_order_id(call.from_user.id) #####
     order_id_location = await db.get_last_order_location(call.from_user.id)
-    # order_data = await db.get_last_user_order_detail_after_confirm(user_id=call.from_user.id)  ####
     sellers_list = await db.get_sellers_id_for_location(order_id_location['location_id'])
     if sellers_list:
         await db.update_order_status_and_date(order_id_location["order_id"],

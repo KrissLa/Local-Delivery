@@ -21,7 +21,6 @@ async def order_ready(call: CallbackQuery, callback_data: dict):
     client_id = int(callback_data.get('user_id'))
 
     order_detail = await db.get_active_order_data(order_id)
-    # order_detail = await db.get_ready_order_for_courier(order_id)
     try:
         await bot.send_message(chat_id=order_detail['courier_telegram_id'],
                                text=f"{attention_em_red} Заказ № {order_id} готов для доставки!\n"

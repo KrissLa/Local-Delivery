@@ -1,6 +1,7 @@
 import logging
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
+
 from loader import db
 
 del_time = [10, 15, 20, 25, 40, 60]
@@ -124,15 +125,6 @@ async def test_op(op_order_id, op_product_id, op_product_name, op_quantity,
                                 op_price_per_unit, op_price)
 
 
-# def add_order():
-#     await db.test_order(
-#         order_final_price=,
-#      #   order_reason_for_rejection=)
-#
-#
-# pass
-
-
 async def generate_table():
     date_list = get_date_list()
     n = 1
@@ -243,12 +235,10 @@ async def generate_table():
             else:
                 op_price_per_unit = pr['price_6']
             op_price = op_price_per_unit * pr_quant
-            sum +=op_price
+            sum += op_price
 
             await db.test_order_product(order_id, pr["product_id"], pr['product_name'], pr_quant,
                                         op_price_per_unit, op_price)
         await db.test_price(order_id, sum)
         print(f'Добавил заказ {n}')
-        n +=1
-
-
+        n += 1

@@ -6,154 +6,23 @@ from aiogram.types import CallbackQuery, ContentTypes, InlineKeyboardMarkup, Inl
 
 from filters.users_filters import IsAdminMessage
 from keyboards.inline.callback_datas import admin_data, metro_del_data, location_data, categories_data, new_item_size, \
-    edit_item_data, edit_item_sizes_data, edit_size_data, take_delivery_order, dont_take_delivery_order, \
-    confirm_delivery_order
+    edit_item_data, edit_item_sizes_data, edit_size_data
 from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_key_board_with_admins, \
     generate_key_board_with_metro, yes_and_cancel_admin_markup, generate_key_board_with_locations, \
     add_one_more_local_object, add_one_more_category_markup, item_with_size, confirm_item_markup, \
     add_one_more_product_size, generate_keyboard_with_metro_for_seller_admin, \
-    get_edit_item_markup, back_button, back_to_choices_sizes, confirm_item_markup_first, \
-    gen_take_order_markup, confirm_cancel_delivery
+    get_edit_item_markup, back_button, back_to_choices_sizes, confirm_item_markup_first
 from loader import dp, bot, db
 from states.admin_state import AddAdmin
-from utils.emoji import attention_em, attention_em_red, error_em, success_em, warning_em
+from utils.emoji import attention_em, attention_em_red, error_em, success_em
 from utils.temp_orders_list import get_sizes, get_list_of_products, get_list_of_products_for_remove_from_stock, \
     get_list_of_products_for_return_to_stock, \
-    get_list_of_products_for_edit, get_sizes_for_remove, get_sizes_for_edit, weekdays, get_list_of_delivery_products, \
+    get_list_of_products_for_edit, get_sizes_for_remove, get_sizes_for_edit, get_list_of_delivery_products, \
     get_list_of_delivery_products_for_remove_from_stock, \
     get_list_of_delivery_products_for_return_to_stock, get_list_of_delivery_products_for_edit
 
 
-@dp.callback_query_handler(categories_data.filter(), state=AddAdmin.EditDeliveryItem)
-async def get_category_for_return_item_to_stock(call: CallbackQuery, callback_data: dict):
-    """Получаем категорию, в которую будем возвращать товар"""
-    await call.message.edit_reply_markup()
-    category_id = int(callback_data.get('category_id'))
-    products = await db.get_delivery_products_list(category_id)
-    if products:
-        list_of_products = await get_list_of_delivery_products_for_edit(products)
-        await call.message.answer(list_of_products,
-                                  reply_markup=cancel_admin_markup)
-    else:
-        await call.message.answer('В этой категории нет товаров',
-                                  reply_markup=cancel_admin_markup)
-    await AddAdmin.EditDeliveryItemID.set()
 
-
-@dp.message_handler(IsAdminMessage(), regexp="edit_delivery_item_price_by_id_\d+",
-                    state=AddAdmin.EditDeliveryItemID)
-async def edit_item_by_id(message: types.Message, state: FSMContext):
-    """Меняем цену товара"""
-    try:
-        product_id = int(message.text.split('_')[-1])
-        await state.update_data(item_id=product_id)
-        item = await db.get_delivery_product_by_id(product_id)
-        await state.update_data(item_name=item["delivery_product_name"])
-        logging.info(item)
-        await message.answer(f'ID товара - {item["delivery_product_id"]}\n'
-                             f'Название - {item["delivery_product_name"]}\n'
-                             f'Цена за лоток - {item["delivery_price"]} руб.\n\n'
-                             f'{attention_em} Чтобы изменить цену введите ее.\n'
-                             f'Пример:\n'
-                             f'2100',
-                             reply_markup=cancel_admin_markup)
-        await AddAdmin.EditDeliveryItemPrice.set()
-    except Exception as err:
-        logging.error(err)
-        await message.answer(f'{error_em} Неизвестная команда',
-                             reply_markup=cancel_admin_markup)
-
-
-@dp.message_handler(IsAdminMessage(), state=AddAdmin.EditDeliveryItemPrice)
-async def get_price(message: types.Message, state: FSMContext):
-    """Получаем цену"""
-    try:
-        price = int(message.text)
-        data = await state.get_data()
-        item_id = data.get('item_id')
-        item_name = data.get('item_name')
-        await db.update_delivery_product_price(item_id, price)
-        await message.answer(f'{success_em} Цена обновлена!\n'
-                             f'ID товара - {item_id}\n'
-                             f'Название товара: {item_name}\n'
-                             f'Новая цена за 1 лоток (12шт): {price} руб.')
-        await state.finish()
-    except Exception as err:
-        logging.error(err)
-        await message.answer(f"{error_em} Вам нужно ввести число.\n"
-                             f'Пример: \n'
-                             f'1650',
-                             reply_markup=cancel_admin_markup)
-
-
-@dp.callback_query_handler(categories_data.filter(), state=AddAdmin.ReturnDeliveryItemToStockCategory)
-async def get_category_for_return_item_to_stock(call: CallbackQuery, callback_data: dict):
-    """Получаем категорию, в которую будем возвращать товар"""
-    await call.message.edit_reply_markup()
-    category_id = int(callback_data.get('category_id'))
-    products = await db.get_delivery_products_for_return_to_stock(category_id)
-    if products:
-        list_of_products = await get_list_of_delivery_products_for_return_to_stock(products)
-        await call.message.answer(list_of_products,
-                                  reply_markup=cancel_admin_markup)
-    else:
-        await call.message.answer('В этой категории нет товаров, снятых с продажи',
-                                  reply_markup=cancel_admin_markup)
-    await AddAdmin.ReturnDeliveryItemToStockProduct.set()
-
-
-@dp.message_handler(IsAdminMessage(), regexp="return_delivery_item_to_stock_by_id_\d+",
-                    state=AddAdmin.ReturnDeliveryItemToStockProduct)
-async def return_item_to_stock_by_id(message: types.Message, state: FSMContext):
-    """Возвращаем товар"""
-    try:
-        product_id = int(message.text.split('_')[-1])
-        await db.return_to_stock_delivery_item(product_id)
-        await message.answer('Товар возвращен в продажу\n'
-                             f'{attention_em} Чтобы вернуть еще один снова введите /return_delivery_item_to_stock\n'
-                             f'{attention_em} Чтобы убрать из продажи введите /remove_delivery_item_from_stock')
-        await state.finish()
-    except Exception as err:
-        logging.error(err)
-        await message.answer(f'{error_em} Неизвестная команда',
-                             reply_markup=cancel_admin_markup)
-
-
-@dp.callback_query_handler(categories_data.filter(), state=AddAdmin.RemoveDeliveryItemFromStockCategory)
-async def get_category_for_remove_item_from_stock(call: CallbackQuery, callback_data: dict):
-    """Получаем категорию из которой будем убирать товар"""
-    await call.message.edit_reply_markup()
-    category_id = int(callback_data.get('category_id'))
-    products = await db.get_delivery_products_for_remove_from_stock(category_id)
-    if products:
-        list_of_products = await get_list_of_delivery_products_for_remove_from_stock(products)
-        await call.message.answer(list_of_products,
-                                  reply_markup=cancel_admin_markup)
-    else:
-        await call.message.answer('В этой категории нет товаров в продаже',
-                                  reply_markup=cancel_admin_markup)
-    await AddAdmin.RemoveDeliveryItemFromStockProduct.set()
-
-
-@dp.message_handler(IsAdminMessage(), regexp="remove_delivery_item_from_stock_by_id_\d+",
-                    state=AddAdmin.RemoveDeliveryItemFromStockProduct)
-async def remove_item_from_stock_by_id(message: types.Message, state: FSMContext):
-    """Убираем товар с продажи"""
-    try:
-        product_id = int(message.text.split('_')[-1])
-        await db.remove_from_stock_delivery_item(product_id)
-        await message.answer('Товар снят с продажи\n'
-                             f'{attention_em} Чтобы снять еще один снова введите /remove_delivery_item_from_stock\n'
-                             f'{attention_em} Чтобы вернуть в продажу введите /return_delivery_item_to_stock')
-        await state.finish()
-    except Exception as err:
-        logging.error(err)
-        await message.answer(f'{error_em} Неизвестная команда',
-                             reply_markup=cancel_admin_markup)
-
-
-#########
-###################
 
 
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.RemoveDeliveryItemCat)
@@ -186,8 +55,6 @@ async def remove_item_by_id(message: types.Message, state: FSMContext):
         await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
 
-
-#######################
 
 
 @dp.message_handler(IsAdminMessage(), regexp="remove_delivery_category_by_id_\d+",
@@ -1487,106 +1354,6 @@ async def reset_courier_by_id(message: types.Message, state: FSMContext):
         await db.reset_courier_by_id(courier_id)
         await message.answer('Курьер откреплен от локации.\n'
                              f'{attention_em} Чтобы открепить еще одного снова введите /reset_courier_location')
-        await state.finish()
-    except Exception as err:
-        logging.error(err)
-        await message.answer(f'{error_em} Неизвестная команда',
-                             reply_markup=cancel_admin_markup)
-
-
-@dp.message_handler(IsAdminMessage(), regexp="remove_from_stock_category_by_id_\d+",
-                    state=AddAdmin.RemoveCategoryFromStocks)
-async def remove_category_from_stock_by_id(message: types.Message, state: FSMContext):
-    """Убираем категорию с продажи"""
-    try:
-        category_id = int(message.text.split('_')[-1])
-        await db.remove_from_stock_category(category_id)
-        await message.answer('Категория снята с продажи\n'
-                             f'{attention_em} Чтобы снять еще одну снова введите /remove_category_from_stock\n'
-                             f'{attention_em} Чтобы вернуть в продажу введите /return_category_to_stock')
-        await state.finish()
-    except Exception as err:
-        logging.error(err)
-        await message.answer(f'{error_em} Неизвестная команда',
-                             reply_markup=cancel_admin_markup)
-
-
-@dp.message_handler(IsAdminMessage(), regexp="return_to_stock_category_by_id_\d+",
-                    state=AddAdmin.ReturnCategoryToStocks)
-async def remove_category_from_stock_by_id(message: types.Message, state: FSMContext):
-    """Убираем категорию с продажи"""
-    try:
-        category_id = int(message.text.split('_')[-1])
-        await db.return_to_stock_category(category_id)
-        await message.answer('Категория возвращена в продажу\n'
-                             f'{attention_em} Чтобы вернуть еще одну снова введите /return_category_to_stock\n'
-                             f'{attention_em} Чтобы убрать из продажи введите /remove_category_from_stock')
-        await state.finish()
-    except Exception as err:
-        logging.error(err)
-        await message.answer(f'{error_em} Неизвестная команда',
-                             reply_markup=cancel_admin_markup)
-
-
-@dp.callback_query_handler(categories_data.filter(), state=AddAdmin.RemoveItemFromStockCategory)
-async def get_category_for_remove_item_from_stock(call: CallbackQuery, callback_data: dict):
-    """Получаем категорию из которой будем убирать товар"""
-    await call.message.edit_reply_markup()
-    category_id = int(callback_data.get('category_id'))
-    products = await db.get_products_for_remove_from_stock(category_id)
-    if products:
-        list_of_products = await get_list_of_products_for_remove_from_stock(products)
-        await call.message.answer(list_of_products,
-                                  reply_markup=cancel_admin_markup)
-    else:
-        await call.message.answer('В этой категории нет товаров в продаже',
-                                  reply_markup=cancel_admin_markup)
-    await AddAdmin.RemoveItemFromStockProduct.set()
-
-
-@dp.message_handler(IsAdminMessage(), regexp="remove_item_from_stock_by_id_\d+",
-                    state=AddAdmin.RemoveItemFromStockProduct)
-async def remove_item_from_stock_by_id(message: types.Message, state: FSMContext):
-    """Убираем товар с продажи"""
-    try:
-        product_id = int(message.text.split('_')[-1])
-        await db.remove_from_stock_item(product_id)
-        await message.answer('Товар снят с продажи\n'
-                             f'{attention_em} Чтобы снять еще один снова введите /remove_item_from_stock\n'
-                             f'{attention_em} Чтобы вернуть в продажу введите /return_item_to_stock')
-        await state.finish()
-    except Exception as err:
-        logging.error(err)
-        await message.answer(f'{error_em} Неизвестная команда',
-                             reply_markup=cancel_admin_markup)
-
-
-@dp.callback_query_handler(categories_data.filter(), state=AddAdmin.ReturnItemToStockCategory)
-async def get_category_for_return_item_to_stock(call: CallbackQuery, callback_data: dict):
-    """Получаем категорию, в которую будем возвращать товар"""
-    await call.message.edit_reply_markup()
-    category_id = int(callback_data.get('category_id'))
-    products = await db.get_products_for_return_to_stock(category_id)
-    if products:
-        list_of_products = await get_list_of_products_for_return_to_stock(products)
-        await call.message.answer(list_of_products,
-                                  reply_markup=cancel_admin_markup)
-    else:
-        await call.message.answer('В этой категории нет товаров, снятых с продажи',
-                                  reply_markup=cancel_admin_markup)
-    await AddAdmin.ReturnItemToStockProduct.set()
-
-
-@dp.message_handler(IsAdminMessage(), regexp="return_item_to_stock_by_id_\d+",
-                    state=AddAdmin.ReturnItemToStockProduct)
-async def return_item_to_stock_by_id(message: types.Message, state: FSMContext):
-    """Возвращаем товар"""
-    try:
-        product_id = int(message.text.split('_')[-1])
-        await db.return_to_stock_item(product_id)
-        await message.answer('Товар возвращен в продажу\n'
-                             f'{attention_em} Чтобы вернуть еще один снова введите /return_item_to_stock\n'
-                             f'{attention_em} Чтобы убрать из продажи введите /remove_item_from_stock')
         await state.finish()
     except Exception as err:
         logging.error(err)

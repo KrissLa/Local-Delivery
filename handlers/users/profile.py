@@ -2,7 +2,7 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
-from filters.users_filters import IsNotClientCallback, IsNotClientMessage
+from filters.users_filters import IsNotClientCallback
 from keyboards.inline.callback_datas import metro_data, local_object_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_metro_profile, get_available_local_objects_profile
 from loader import dp, db
@@ -149,9 +149,6 @@ async def set_change_profile_without_address(call: CallbackQuery, state: FSMCont
                               ]
                               ))
     await state.finish()
-
-
-
 
 
 @dp.message_handler(state=ProfileState.WaitAddress)

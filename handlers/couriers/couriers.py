@@ -15,6 +15,7 @@ from utils.emoji import success_em, error_em, attention_em, warning_em
 @dp.callback_query_handler(IsCourierCallback(), order_is_delivered.filter())
 async def confirm_delivery_courier(call: CallbackQuery, callback_data: dict):
     """Курьер подтверждает доставку"""
+    await call.message.edit_reply_markup()
     order_id = int(callback_data.get('order_id'))
     user_id = int(callback_data.get('user_id'))
     if await db.order_is_not_canceled(order_id):

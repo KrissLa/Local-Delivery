@@ -46,7 +46,7 @@ async def confirm_delivery_order(call: CallbackQuery, callback_data: dict, state
     order_id = int(callback_data.get('order_id'))
     await db.update_delivery_order_delivered_at(order_id, 'Заказ выполнен')
     order_owner = await db.get_delivery_order_owner(order_id)
-    admin_id = await db.get_delivery_admin_telg_id(order_id)
+    admin_id = await db.get_delivery_admin_tg_id(order_id)
     try:
         await bot.send_message(admin_id, f'{success_em} Заказ на поставку продуктов № {order_id} доставлен.')
     except Exception as err:

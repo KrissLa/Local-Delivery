@@ -60,7 +60,7 @@ async def add_new_seller(message: types.Message, state: FSMContext):
     await SellerAdmin.DeliveryCategory.set()
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['add_new_seller'], state=states_for_menu)
+@dp.message_handler(IsSellerAdminMessage(), commands=['add_new_seller'], state="*")
 @dp.message_handler(IsSellerAdminMessage(), commands=['add_new_seller'])
 async def add_new_seller(message: types.Message, state: FSMContext):
     """Добавление продавца в локацию"""
@@ -73,7 +73,7 @@ async def add_new_seller(message: types.Message, state: FSMContext):
     await SellerAdmin.SellerName.set()
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['remove_sellers_'], state=states_for_menu)
+@dp.message_handler(IsSellerAdminMessage(), commands=['remove_sellers_'], state='*')
 @dp.message_handler(IsSellerAdminMessage(), commands=['remove_sellers_'])
 async def remove_sellers(message: types.Message, state: FSMContext):
     """Удаляем продавца из локации"""
@@ -92,7 +92,7 @@ async def remove_sellers(message: types.Message, state: FSMContext):
     await SellerAdmin.RemoveSeller.set()
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['add_new_courier'], state=states_for_menu)
+@dp.message_handler(IsSellerAdminMessage(), commands=['add_new_courier'], state='*')
 @dp.message_handler(IsSellerAdminMessage(), commands=['add_new_courier'])
 async def add_new_courier(message: types.Message, state: FSMContext):
     """Добавление курьера в локацию"""
@@ -105,7 +105,7 @@ async def add_new_courier(message: types.Message, state: FSMContext):
     await SellerAdmin.CourierName.set()
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['remove_courier_'], state=states_for_menu)
+@dp.message_handler(IsSellerAdminMessage(), commands=['remove_courier_'], state='*')
 @dp.message_handler(IsSellerAdminMessage(), commands=['remove_courier_'])
 async def remove_courier(message: types.Message, state: FSMContext):
     """Удаляем курьера из локации"""
@@ -124,7 +124,7 @@ async def remove_courier(message: types.Message, state: FSMContext):
     await SellerAdmin.RemoveCourier.set()
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['remove_category_from_stock'], state=states_for_menu)
+@dp.message_handler(IsSellerAdminMessage(), commands=['remove_category_from_stock'], state='*')
 @dp.message_handler(IsSellerAdminMessage(), commands=['remove_category_from_stock'])
 async def remove_category_from_stock(message: types.Message, state: FSMContext):
     """Убираем категорию из продажи"""
@@ -143,7 +143,7 @@ async def remove_category_from_stock(message: types.Message, state: FSMContext):
     await SellerAdmin.RemoveCategoryFromStock.set()
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['return_category_to_stock'], state=states_for_menu)
+@dp.message_handler(IsSellerAdminMessage(), commands=['return_category_to_stock'], state='*')
 @dp.message_handler(IsSellerAdminMessage(), commands=['return_category_to_stock'])
 async def return_category_to_stock(message: types.Message, state: FSMContext):
     """Возвращаем категорию в продажу"""
@@ -162,7 +162,7 @@ async def return_category_to_stock(message: types.Message, state: FSMContext):
     await SellerAdmin.ReturnCategoryToStock.set()
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['remove_item_from_stock'], state=states_for_menu)
+@dp.message_handler(IsSellerAdminMessage(), commands=['remove_item_from_stock'], state='*')
 @dp.message_handler(IsSellerAdminMessage(), commands=['remove_item_from_stock'])
 async def remove_item_from_stock(message: types.Message, state: FSMContext):
     """Убираем товар из продажу"""
@@ -180,7 +180,7 @@ async def remove_item_from_stock(message: types.Message, state: FSMContext):
     await SellerAdmin.RemoveItemFromStockCategory.set()
 
 
-@dp.message_handler(IsSellerAdminMessage(), commands=['return_item_to_stock'], state=states_for_menu)
+@dp.message_handler(IsSellerAdminMessage(), commands=['return_item_to_stock'], state='*')
 @dp.message_handler(IsSellerAdminMessage(), commands=['return_item_to_stock'])
 async def return_item_to_stock(message: types.Message, state: FSMContext):
     """Возвращаем товар в продажу"""

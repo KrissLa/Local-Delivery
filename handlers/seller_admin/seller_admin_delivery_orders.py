@@ -707,7 +707,6 @@ async def save_changes(call: CallbackQuery, state: FSMContext):
         if order_data["delivery_order_courier_id"]:
             try:
                 courier_id = await db.get_delivery_courier_tg_id(delivery_order_id)
-                # await db.update_delivery_order_courier_null_and_status(delivery_order_id)
                 await bot.send_message(courier_id, f'{attention_em_red} Изменена дата доставки заказа'
                                                    f' № {delivery_order_id}.\n'
                                                    f'Адрес доставки: {order_data["location_name"]},\n'

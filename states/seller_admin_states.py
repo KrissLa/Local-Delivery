@@ -14,7 +14,7 @@ class SellerAdmin(StatesGroup):
     RemoveCourier = State()
 
     RemoveCategoryFromStock = State()
-    ReturnCategoryToStock =State()
+    ReturnCategoryToStock = State()
 
     RemoveItemFromStockCategory = State()
     RemoveItemFromStockProduct = State()
@@ -46,4 +46,3 @@ class SellerAdmin(StatesGroup):
     Day = State()
 
     Email = State()
-

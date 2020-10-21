@@ -134,7 +134,7 @@ async def back_to_one_more_or_next(call: CallbackQuery, state: FSMContext):
     list_products = await get_temp_orders_list_message(temp_orders)
     await state.update_data(list_products=list_products)
     await state.update_data(final_price=final_price)
-    lst_order= await db.get_last_order_id(call.from_user.id)
+    lst_order = await db.get_last_order_id(call.from_user.id)
     await db.delete_order_by_id(lst_order)
     await call.message.answer(text=f'Сумма заказа - {final_price} руб.\n'
                                    'Оформить заказ\n'
