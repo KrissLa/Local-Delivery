@@ -43,11 +43,15 @@ class AddAdmin(StatesGroup):
 
     ItemCategory = State()
     ItemName = State()
-    ItemPhoto =State()
-    ItemDescription =State()
-    ItemSize =State()
-    ItemPrice =State()
+    ItemPhoto = State()
+    ItemDescription = State()
+    ItemSize = State()
+    ItemPrice = State()
     ItemConfirm = State()
+
+    ItemSizeNameFirst = State()
+    ItemSizePriceFirst = State()
+    ItemSizeConfirmFirst = State()
 
     ItemSizeName = State()
     ItemSizePrice = State()
@@ -57,7 +61,6 @@ class AddAdmin(StatesGroup):
 
     RemoveItemCategory = State()
     RemoveItem = State()
-
 
     AdminSellerName = State()
     AdminSellerID = State()
@@ -83,15 +86,14 @@ class AddAdmin(StatesGroup):
     RemoveCourier = State()
     ResetCourier = State()
 
-    RemoveCategoryFromStocks = State()
-    ReturnCategoryToStocks = State()
+    RemoveCategoryFromStocks = State()  #
+    ReturnCategoryToStocks = State()  #
 
+    ReturnItemToStockCategory = State()  #
+    ReturnItemToStockProduct = State()  #
 
-    ReturnItemToStockCategory = State()
-    ReturnItemToStockProduct = State()
-
-    RemoveItemFromStockCategory = State()
-    RemoveItemFromStockProduct = State()
+    RemoveItemFromStockCategory = State()  #
+    RemoveItemFromStockProduct = State()  #
 
     ChangeSellerAdmin = State()
     ChangeSellerAdminMetro = State()
@@ -118,7 +120,6 @@ class AddAdmin(StatesGroup):
     EditItemByAvailability = State()
     EditItemBySizes = State()
 
-
     EditItemNewSizeName = State()
     EditItemNewSizePrices = State()
 
@@ -130,4 +131,47 @@ class AddAdmin(StatesGroup):
     EditItemEditSizeByIdName = State()
     EditItemEditSizeByIdPrices = State()
 
+    DeliveryCategoryName = State()
+    DeliveryItemCategory = State()
+    DeliveryItemName = State()
+    DeliveryItemPrice = State()
 
+    TakeOrders = State()
+    SetCourierOrders = State()
+    ConfirmDeliveryOrders = State()
+    TakeOrdersWait = State()
+
+    RemoveDeliveryCategory = State()
+    RemoveDeliveryItemCat = State()
+    RemoveDeliveryItem = State()
+
+    RemoveDeliveryItemFromStockCategory = State()  #
+    RemoveDeliveryItemFromStockProduct = State()  #
+
+    ReturnDeliveryItemToStockCategory = State()  #
+    ReturnDeliveryItemToStockProduct = State()  #
+
+    EditDeliveryItem = State()  #
+    EditDeliveryItemPrice = State()  #
+    EditDeliveryItemID = State()  #
+
+    DeliveryCourierName = State()
+    DeliveryCourierID = State()
+    RemoveDeliveryCourier = State()
+
+    Email = State()
+
+    Statistics = State()
+
+    Year = State()
+    Month = State()
+    Day = State()
+    LocYear = State()
+    LocMonth = State()
+    LocDay = State()
+
+    DeliveryMonth = State()
+    DeliveryDay = State()
+
+    DeliveryLocMonth = State()
+    DeliveryLocDay = State()

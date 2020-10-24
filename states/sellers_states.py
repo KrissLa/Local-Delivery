@@ -5,3 +5,8 @@ class SelectCourier(StatesGroup):
     """Стейты для выбора курьера"""
     WaitCourier = State()
     WaitReason = State()
+
+    WaitReasonActive = State()
+    WaitReasonCourier = State()
+
+    CancelBonus = State()

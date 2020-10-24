@@ -1,56 +1,17 @@
+from datetime import datetime
+import logging
+
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from pytz import timezone
 
 from keyboards.inline.callback_datas import bonuses_data, cancel_bonus_order_data
 from keyboards.inline.inline_keyboards import back_cancel_bonus_markup
 from loader import dp, db, bot
 from states.bonus_state import Bonus
+from utils.emoji import attention_em, error_em, success_em
 from utils.send_messages import send_message_to_sellers_bonus
-
-
-@dp.message_handler(text="Акции и бонусы")
-async def send_categories_menu(message: types.Message):
-    """Нажатие на кнопку акции и бонусы"""
-    data = await db.get_bonus_and_location_address(message.from_user.id)
-    bot_user = await dp.bot.get_me()
-    if data['bonus'] == 0:
-        await message.answer("Ваш бонусный баланс:\n"
-                             f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n")
-    else:
-        await message.answer("Ваш бонусный баланс:\n"
-                             f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n"
-                             f"Подойдите к продавцу и нажмите Получить\n"
-                             f"Ближайтей адрес: {data['location_address']}",
-                             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                 [
-                                     InlineKeyboardButton(
-                                         text='Получить',
-                                         callback_data=bonuses_data.new(count_bonus=data['bonus'])
-                                     )
-                                 ]
-                             ]))
-
-    await message.answer(f'Пригласите друга и после первого заказа мы подарим Вам 1 ролл на Ваш выбор.\n'
-                         f'\n'
-                         f'Мы также будем дарить Вам по 1 роллу с каждого 10 заказа любого из Ваших друзей.\n\n'
-                         f'! Промо акция действует бессрочно и только при заказе через данный сервисный бот.\n\n'
-                         f'Ваша реферальная ссылка:\n'
-                         f'http://t.me/{bot_user.username}?start={message.from_user.id}',
-                         reply_markup=InlineKeyboardMarkup(
-                             inline_keyboard=[
-                                 [
-                                     InlineKeyboardButton(
-                                         text='Показать в QR code',
-                                         callback_data='show_qr_ref_link'
-                                     ),
-                                     InlineKeyboardButton(
-                                         text='Поделиться',
-                                         switch_inline_query='share'
-                                     )
-                                 ]
-                             ]
-                         ))
 
 
 @dp.callback_query_handler(text='cancel_bonus_order', state=Bonus.Count)
@@ -68,7 +29,7 @@ async def back_to_bonus(call: CallbackQuery, state: FSMContext):
         await call.message.answer("Ваш бонусный баланс:\n"
                                   f"Любой гриль ролл из ассортимента - {data['bonus']} шт.\n"
                                   f"Подойдите к продавцу и нажмите Получить\n"
-                                  f"Ближайтей адрес: {data['location_address']}",
+                                  f"Ближайший адрес: {data['location_address']}",
                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                       [
                                           InlineKeyboardButton(
@@ -81,7 +42,7 @@ async def back_to_bonus(call: CallbackQuery, state: FSMContext):
     await call.message.answer(f'Пригласите друга и после первого заказа мы подарим Вам 1 ролл на Ваш выбор.\n'
                               f'\n'
                               f'Мы также будем дарить Вам по 1 роллу с каждого 10 заказа любого из Ваших друзей.\n\n'
-                              f'! Промо акция действует бессрочно и только при заказе через данный сервисный бот.\n\n'
+                              f'{attention_em} Промо акция действует бессрочно и только при заказе через данный сервисный бот.\n\n'
                               f'Ваша реферальная ссылка:\n'
                               f'http://t.me/{bot_user.username}?start={call.from_user.id}',
                               reply_markup=InlineKeyboardMarkup(
@@ -104,7 +65,6 @@ async def back_to_bonus(call: CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(text='show_qr_ref_link')
 async def show_qr_ref_code(call: CallbackQuery):
     """Генерируем qr code"""
-    await call.message.edit_reply_markup()
     bot_user = await dp.bot.get_me()
 
     await bot.send_photo(chat_id=call.from_user.id,
@@ -113,6 +73,7 @@ async def show_qr_ref_code(call: CallbackQuery):
 
 @dp.callback_query_handler(bonuses_data.filter())
 async def get_bonus_order(call: CallbackQuery, callback_data: dict, state: FSMContext):
+    """Просим написать количество"""
     count_bonus = int(callback_data.get('count_bonus'))
     await state.update_data(count_bonus=count_bonus)
     await call.message.answer('Напишите количество.\n'
@@ -121,36 +82,39 @@ async def get_bonus_order(call: CallbackQuery, callback_data: dict, state: FSMCo
     await Bonus.Count.set()
 
 
-@dp.message_handler(regexp="\d+", state=Bonus.Count)
+@dp.message_handler(state=Bonus.Count)
 async def get_count_bonus(message: types.Message, state: FSMContext):
+    """Получаем количество"""
     data = await state.get_data()
     count_bonus = data.get('count_bonus')
     try:
         quantity = int(message.text)
         if quantity > count_bonus:
-            await message.answer('Напишите количество.\n'
+            await message.answer(f'{error_em} Напишите количество.\n'
                                  f"Вам доступно - {count_bonus} шт.",
                                  reply_markup=back_cancel_bonus_markup)
             await Bonus.Count.set()
         elif quantity == 0:
-            await message.answer('Введите что-то кроме 0.\n'
+            await message.answer(f'{error_em} Введите что-то кроме 0.\n'
                                  f"Вам доступно - {count_bonus} шт.",
                                  reply_markup=back_cancel_bonus_markup)
             await Bonus.Count.set()
         else:
             bonus_location_id = await db.get_user_location_id(message.from_user.id)
-            await db.add_bonus_order(message.from_user.id,
-                                     bonus_location_id,
+            await db.add_bonus_order(bonus_location_id,
+                                     datetime.now(timezone("Europe/Moscow")),
+                                     await db.get_user_id(message.from_user.id),
+                                     datetime.now(timezone("Europe/Moscow")),
                                      quantity,
-                                     bonus_order_status='Ожидание продавца')
+                                     'Ожидание продавца')
             await db.change_bonus_minus(user_id=message.from_user.id,
                                         count_bonus=quantity)
             bonus_order_info = await db.get_bonus_order_info(message.from_user.id)
-            sellers_list = await db.get_sellers_id_for_location(bonus_order_info['bonus_location_id'])
+            sellers_list = await db.get_sellers_id_for_location(bonus_order_info['bonus_order_location_id'])
             if sellers_list:
                 await message.answer(f'Ваш заказ № {bonus_order_info["bonus_order_id"]}Б сформирован - '
-                                     f'{bonus_order_info["bonus_quantity"]} шт.\n'
-                                     f'Пожалуйста, покажите это сообщение продавцу',
+                                     f'{bonus_order_info["bonus_order_quantity"]} шт.\n'
+                                     f'{attention_em} Пожалуйста, покажите это сообщение продавцу',
                                      reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                          [
                                              InlineKeyboardButton(
@@ -161,22 +125,25 @@ async def get_count_bonus(message: types.Message, state: FSMContext):
                                          ]
                                      ]))
                 await send_message_to_sellers_bonus(sellers_list, bonus_order_info)
-                await Bonus.WaitSeller.set()
+                await state.finish()
             else:
                 await message.answer('Нет доступных продавцов. Попробуйте позже.')
                 await db.change_bonus_plus(user_id=message.from_user.id,
                                            count_bonus=quantity)
-                await db.set_bonus_order_status(bonus_order_info["bonus_order_id"], "Отклонен")
+                await db.set_bonus_order_status(bonus_order_info["bonus_order_id"],
+                                                "Отклонен",
+                                                'Не нашел доступных продавцов')
                 await state.finish()
 
     except Exception as err:
+        logging.error(err)
         await message.answer('Напишите количество.\n'
                              f"Вам доступно - {count_bonus} шт.",
                              reply_markup=back_cancel_bonus_markup)
         await Bonus.Count.set()
 
 
-@dp.callback_query_handler(cancel_bonus_order_data.filter(), state=Bonus.WaitSeller)
+@dp.callback_query_handler(cancel_bonus_order_data.filter())
 async def cancel_bonus_order(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Отмена бонусного заказа после ввода количества"""
     await call.message.edit_reply_markup()
@@ -186,11 +153,15 @@ async def cancel_bonus_order(call: CallbackQuery, callback_data: dict, state: FS
     if bonus_status == 'Ожидание продавца':
         await db.change_bonus_plus(user_id=call.from_user.id,
                                    count_bonus=quantity)
-        await db.set_bonus_order_status(b_order_id, "Отклонен")
+        await db.set_bonus_order_status(b_order_id,
+                                        "Отменен пользователем до принятия продавцом",
+                                        'Причина не указана')
+        await db.set_bonus_order_canceled_at(b_order_id)
         await state.finish()
-        await call.message.answer(f'Ваш заказ № {b_order_id}Б отменен.')
+        await call.message.answer(f'{success_em}Ваш заказ № {b_order_id}Б отменен.')
     else:
-        await call.message.answer('Ваш заказ уже подтвержден. Если что-то не так, пожалуйста, подойдите к продавцу.')
+        await call.message.answer(f'{error_em} Ваш заказ уже подтвержден. Чтобы отменить его, пожалуйста, подойдите к '
+                                  f'продавцу.')
 
 
 @dp.callback_query_handler(text='return_to_bot', state=Bonus.WaitSeller)

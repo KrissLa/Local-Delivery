@@ -2,52 +2,12 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
+from filters.users_filters import IsNotClientCallback
 from keyboards.inline.callback_datas import metro_data, local_object_data
-from keyboards.inline.inline_keyboards import generate_keyboard_with_metro_profile, get_available_local_objects_profile, \
-    generate_keyboard_with_metro
+from keyboards.inline.inline_keyboards import generate_keyboard_with_metro_profile, get_available_local_objects_profile
 from loader import dp, db
-from states.menu_states import SignUpUser
 from states.profile_states import ProfileState
-
-
-@dp.message_handler(text="Профиль")
-async def send_categories_menu(message: types.Message):
-    """Отправляем информацию профиля"""
-    try:
-        user_info = await db.get_user_profile_info(message.from_user.id)
-        print(user_info)
-        if user_info['user_address']:
-            await message.answer(f"Ваш профиль\n"
-                                 f"\n"
-                                 f"User ID: {user_info['user_telegram_id']}\n"
-                                 f"Адрес доставки: {user_info['local_object_name']}\n"
-                                 f"Параметры доставки: {user_info['user_address']}",
-                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                     [
-                                         InlineKeyboardButton(
-                                             text='Изменить',
-                                             callback_data='change_profile'
-                                         )
-                                     ]
-                                 ]))
-        else:
-            await message.answer(text=f"Ваш профиль\n"
-                                      f"\n"
-                                      f"User ID: {user_info['user_telegram_id']}\n"
-                                      f"Адрес доставки: {user_info['local_object_name']}\n"
-                                      f"Параметры доставки: Не указаны",
-                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                     [
-                                         InlineKeyboardButton(
-                                             text='Изменить',
-                                             callback_data='change_profile'
-                                         )
-                                     ]
-                                 ]))
-    except Exception as err:
-        await message.answer(f"Сначала нужно выбрать ближайшую станцию метро и точку продаж",
-                             reply_markup=await generate_keyboard_with_metro())
-        await SignUpUser.Metro.set()
+from utils.emoji import warning_em
 
 
 @dp.callback_query_handler(text='cancel', state=[ProfileState.WaitMetro,
@@ -57,7 +17,6 @@ async def send_categories_menu(call: CallbackQuery, state: FSMContext):
     """Отправляем информацию профиля"""
     await call.message.edit_reply_markup()
     user_info = await db.get_user_profile_info(call.from_user.id)
-    print(user_info)
     if user_info['user_address']:
         await call.message.answer(f"Ваш профиль\n"
                                   f"\n"
@@ -77,7 +36,7 @@ async def send_categories_menu(call: CallbackQuery, state: FSMContext):
                                        f"\n"
                                        f"User ID: {user_info['user_telegram_id']}\n"
                                        f"Адрес доставки: {user_info['local_object_name']}\n"
-                                       f"Параметры доставки: Не указаны",
+                                       f"{warning_em} Параметры доставки: Не указаны",
                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                       [
                                           InlineKeyboardButton(
@@ -93,17 +52,18 @@ async def send_categories_menu(call: CallbackQuery, state: FSMContext):
 async def change_profile(call: CallbackQuery):
     """Пользователь нажимает изменить"""
     await call.message.edit_reply_markup()
-    await call.message.answer(f"Для начала выберите ближайшее метро.",
+    await call.message.answer(f"Для начала выберите ближайшую станцию метро.",
                               reply_markup=await generate_keyboard_with_metro_profile())
     await ProfileState.WaitMetro.set()
 
 
 @dp.callback_query_handler(metro_data.filter(), state=ProfileState.WaitMetro)
-async def get_user_location(call: CallbackQuery, callback_data: dict):
+async def get_user_location(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Предлагаем пользователю выбрать локацию"""
     await call.message.edit_reply_markup()
     await call.answer(cache_time=10)
     metro_id = int(callback_data.get('metro_id'))
+    await state.update_data(metro_id=metro_id)
     metro_name = await db.get_metro_name_by_metro_id(metro_id)
     await call.message.answer(f"Вы выбрали {metro_name} \n"
                               f"Выберите объект локальной доставки",
@@ -135,6 +95,33 @@ async def get_user_address(call: CallbackQuery, callback_data: dict, state: FSMC
                                   ]
                               ]))
     await ProfileState.WaitAddress.set()
+
+
+@dp.callback_query_handler(IsNotClientCallback(), text='address_later', state=ProfileState.WaitAddress)
+async def set_change_profile_without_address(call: CallbackQuery, state: FSMContext):
+    """Обновляем данные профиля без адреса"""
+    data = await state.get_data()
+    local_object_id = data.get('local_object_id')
+    loc_data = await db.get_local_object_data_by_id(local_object_id)
+    await db.add_user(call.from_user.id,
+                      loc_data['local_object_metro_id'],
+                      loc_data['local_object_location_id'],
+                      local_object_id
+                      )
+    await call.message.answer("Данные профиля обновлены.\n"
+                              f"User ID: {call.from_user.id}\n"
+                              f"Адрес доставки: {loc_data['local_object_name']}\n"
+                              f"Параметры доставки: Не указаны\n",
+                              reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                  [
+                                      InlineKeyboardButton(
+                                          text='Изменить',
+                                          callback_data='change_profile'
+                                      )
+                                  ]
+                              ]
+                              ))
+    await state.finish()
 
 
 @dp.callback_query_handler(text='address_later', state=ProfileState.WaitAddress)

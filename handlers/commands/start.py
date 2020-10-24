@@ -1,3 +1,4 @@
+import logging
 from re import compile
 
 from aiogram import types
@@ -11,11 +12,14 @@ from keyboards.inline.callback_datas import metro_data, local_object_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_metro, get_available_local_objects
 from loader import dp, db
 from states.menu_states import SignUpUser
+from utils.check_states import reset_state
+from utils.emoji import attention_em
 
 
 @dp.message_handler(CommandStart(deep_link=compile(r'\d\w*')), state=['*'])
 async def bot_start_referal(message: types.Message, state: FSMContext):
     """Отлавливаем реферальные ссылки"""
+    await reset_state(state, message)
     user_id = message.from_user.id
     if await db.get_user(user_id):
         await message.answer('Вы уже зарегистрированы в боте. Пожалуйста, воспользуйтесь командами из меню.',
@@ -27,47 +31,51 @@ async def bot_start_referal(message: types.Message, state: FSMContext):
                 await state.update_data(inviter_id=deep_link_args)
                 await message.answer(f"Приветствуем! \n"
                                      f"Ваш реферальный код принят!"
-                                     f"\nДля оформления заказа выберите ближайшее метро.",
+                                     f"\nДля оформления заказа выберите ближайшую станцию метро.",
                                      reply_markup=await generate_keyboard_with_metro())
                 await SignUpUser.Metro.set()
             else:
                 await message.answer(f"Приветствуем! \n"
                                      f"Ваша реферальная ссылка недействительна."
-                                     f"\nДля оформления заказа выберите ближайшее метро.",
+                                     f"\nДля оформления заказа выберите ближайшую станцию метро.",
                                      reply_markup=await generate_keyboard_with_metro())
                 await SignUpUser.Metro.set()
         except Exception as err:
+            logging.error(err)
             await message.answer(f"Приветствуем! \n"
                                  f"Ваша реферальная ссылка недействительна."
-                                 f"\nДля оформления заказа выберите ближайшее метро.",
+                                 f"\nДля оформления заказа выберите ближайшую станцию метро.",
                                  reply_markup=await generate_keyboard_with_metro())
             await SignUpUser.Metro.set()
 
 
+@dp.message_handler(IsNotClientMessage(), state=['*'])
 @dp.message_handler(HasNoMetro(), IsNotClientMessage(), state=['*'])
 @dp.message_handler(HasNoLocation(), IsNotClientMessage(), state=['*'])
 @dp.message_handler(HasNoLocalObject(), IsNotClientMessage(), state=['*'])
 @dp.message_handler(CommandStart(deep_link=None), state=['*'])
-async def bot_start(message: types.Message):
+async def bot_start(message: types.Message, state: FSMContext):
     """Нажатие на старт без реферального кода"""
+    await reset_state(state, message)
     user_id = message.from_user.id
     if await db.get_user(user_id):
         await message.answer('Вы уже зарегистрированы в боте. Пожалуйста, воспользуйтесь командами из меню.',
                              reply_markup=menu_keyboard)
     else:
-        await message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшее метро.",
+        await message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшую станцию метро.",
                              reply_markup=await generate_keyboard_with_metro())
         await SignUpUser.Metro.set()
 
 
 @dp.callback_query_handler(metro_data.filter(), state=SignUpUser.Metro)
-async def get_user_location(call: CallbackQuery, callback_data: dict):
+async def get_user_location(call: CallbackQuery, callback_data: dict, state: FSMContext):
     """Предлагаем пользователю выбрать локацию"""
     await call.answer(cache_time=10)
     await call.message.edit_reply_markup()
     metro_id = int(callback_data.get('metro_id'))
+    await state.update_data(metro_id=metro_id)
     metro_name = await db.get_metro_name_by_metro_id(metro_id)
-    await call.message.answer(f"Вы выбрали {metro_name} \n"
+    await call.message.answer(f"Вы выбрали {metro_name}. \n"
                               f"Выберите объект локальной доставки",
                               reply_markup=await get_available_local_objects(metro_id))
     await SignUpUser.Location.set()
@@ -76,7 +84,7 @@ async def get_user_location(call: CallbackQuery, callback_data: dict):
 @dp.callback_query_handler(text='back', state=SignUpUser.Location)
 async def none_location_list(call: CallbackQuery):
     await call.message.edit_reply_markup()
-    await call.message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшее метро.",
+    await call.message.answer(f"Приветствуем! \nДля оформления заказа выберите ближайшую станцию метро.",
                               reply_markup=await generate_keyboard_with_metro())
     await SignUpUser.Metro.set()
 
@@ -86,7 +94,11 @@ async def set_user_location(call: CallbackQuery, callback_data: dict, state: FSM
     """Сохраняем данные в бд. Отправляем меню"""
     await call.answer(text='Локация выбрана', cache_time=10)
     data = await state.get_data()
-    inviter_id = data.get('inviter_id')
+    try:
+        inviter_id = data.get('inviter_id')
+    except Exception as err:
+        logging.info(err)
+        inviter_id = None
     await call.message.edit_reply_markup()
     local_object_id = int(callback_data.get('local_object_id'))
     loc_data = await db.get_local_object_data_by_id(local_object_id)
@@ -109,8 +121,8 @@ async def set_user_location(call: CallbackQuery, callback_data: dict, state: FSM
     await call.message.answer(f'Все готово!\n'
                               f'Мы сохранили Ваш выбор {loc_data["local_object_name"]}.\n'
                               f'Теперь Вы можете заказывать еду и напитки из нашего меню с доставкой к Вам на работу.\n'
-                              f'Вы всегда можете изменить эти настройки в Вашем профиле.\n'
+                              f'{attention_em} Вы всегда можете изменить эти настройки в Вашем профиле.\n'
                               f'Ваша ссылка для приглашения друзей:\n'
                               f'http://t.me/{bot_user.username}?start={call.from_user.id}\n'
-                              f'Подробнее о реферальной системе можно узнать в разделе "Акции и бонусы".',
+                              f'{attention_em} Подробнее о реферальной системе можно узнать в разделе "Акции и бонусы".',
                               reply_markup=menu_keyboard)

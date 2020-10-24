@@ -15,6 +15,9 @@ PGUSER = str(os.getenv("PG_USER"))
 PGPASSWORD = str(os.getenv("PG_PASSWORD"))
 REDIS_PASS = str(os.getenv("REDIS_PASS"))
 
+EMAIL_ADDRESS = str(os.getenv("EMAIL_USER"))
+EMAIL_PASSWORD = str(os.getenv("EMAIL_PASS"))
+
 aiogram_redis = {
     'host': ip,
 }
