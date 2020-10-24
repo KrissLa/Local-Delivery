@@ -8,7 +8,6 @@ states_for_menu = '*'
 
 async def reset_state(state, message):
     """обрабатываем выход из меню"""
-    logging.info('reset')
     if await state.get_state() in ['Menu:OrderStatus', 'Menu:WaitReasonUser', 'SelectCourier:WaitReasonCourier',
                                      'SelectCourier:WaitReason', 'SelectCourier:WaitReasonActive']:
         await state.finish()

@@ -177,7 +177,7 @@ class Database:
         sql = """
                 CREATE TABLE IF NOT EXISTS admins (
                 admin_id SERIAL PRIMARY KEY,
-                admin_telegram_id INT NOT NULL UNIQUE,
+                admin_telegram_id  BIGINT NOT NULL UNIQUE,
                 admin_email TEXT,
                 admin_name VARCHAR(255)
                 );
@@ -189,7 +189,7 @@ class Database:
         sql = """
                 CREATE TABLE IF NOT EXISTS admin_sellers (
                 admin_seller_id SERIAL PRIMARY KEY,
-                admin_seller_telegram_id INT NOT NULL UNIQUE,
+                admin_seller_telegram_id BIGINT NOT NULL UNIQUE,
                 admin_seller_name VARCHAR(255) NOT NULL,
                 admin_seller_email TEXT,
                 admin_seller_metro_id INT,
@@ -205,7 +205,7 @@ class Database:
         sql = """
                 CREATE TABLE IF NOT EXISTS sellers (
                 seller_id SERIAL PRIMARY KEY,
-                seller_telegram_id INT NOT NULL UNIQUE,
+                seller_telegram_id BIGINT NOT NULL UNIQUE,
                 seller_name VARCHAR (255) NOT NULL,
                 seller_metro_id INT,
                 seller_location_id INT,
@@ -221,7 +221,7 @@ class Database:
         sql = """
                 CREATE TABLE IF NOT EXISTS couriers (
                 courier_id SERIAL PRIMARY KEY,
-                courier_telegram_id INT NOT NULL UNIQUE,
+                courier_telegram_id BIGINT NOT NULL UNIQUE,
                 courier_name VARCHAR(255) NOT NULL,
                 courier_metro_id INT,
                 courier_location_id INT,
@@ -237,7 +237,7 @@ class Database:
         sql = """
                 CREATE TABLE IF NOT EXISTS delivery_couriers (
                 delivery_courier_id SERIAL PRIMARY KEY,
-                delivery_courier_telegram_id INT NOT NULL UNIQUE,
+                delivery_courier_telegram_id BIGINT NOT NULL UNIQUE,
                 delivery_courier_name VARCHAR(255) NOT NULL,
                 delivery_courier_status BOOLEAN NOT NULL DEFAULT true
                 );
@@ -249,7 +249,7 @@ class Database:
         sql = """
            CREATE TABLE IF NOT EXISTS users (
            user_id SERIAL PRIMARY KEY,
-           user_telegram_id INT NOT NULL UNIQUE,
+           user_telegram_id BIGINT NOT NULL UNIQUE,
            user_metro_id INT,
            user_location_id INT,
            user_local_object_id INT,
@@ -381,7 +381,7 @@ class Database:
         sql = """
            CREATE TABLE IF NOT EXISTS temp_orders (
            temp_order_id SERIAL PRIMARY KEY,
-           temp_order_user_telegram_id INT NOT NULL,
+           temp_order_user_telegram_id BIGINT NOT NULL,
            product_id INT NOT NULL,
            size_id INT,
            product_name VARCHAR(255) NOT NULL,
@@ -397,7 +397,7 @@ class Database:
         sql = """
            CREATE TABLE IF NOT EXISTS temp_delivery_orders (
            temp_delivery_order_id SERIAL PRIMARY KEY,
-           temp_delivery_order_user_telegram_id INT NOT NULL,
+           temp_delivery_order_user_telegram_id BIGINT NOT NULL,
            delivery_product_id INT NOT NULL,
            delivery_product_name VARCHAR(255) NOT NULL,
            delivery_product_price INT NOT NULL,

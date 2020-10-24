@@ -17,11 +17,11 @@ async def set_change_profile(message: types.Message, state: FSMContext):
     local_object_id = data.get('local_object_id')
     loc_data = await db.get_local_object_data_by_id(local_object_id)
     await db.add_user_with_address(message.from_user.id,
-                              loc_data['local_object_metro_id'],
-                              loc_data['local_object_location_id'],
-                              local_object_id,
-                              message.text
-                              )
+                                   loc_data['local_object_metro_id'],
+                                   loc_data['local_object_location_id'],
+                                   local_object_id,
+                                   message.text
+                                   )
     await message.answer("Данные профиля обновлены.\n"
                          f"User ID: {message.from_user.id}\n"
                          f"Адрес доставки: {loc_data['local_object_name']}\n"
@@ -36,7 +36,6 @@ async def set_change_profile(message: types.Message, state: FSMContext):
                          ]
                          ))
     await state.finish()
-
 
 
 @dp.message_handler(HasNoMetro(), IsClientMessage(), state=['*'])
@@ -63,6 +62,3 @@ async def cancel(call: CallbackQuery, state: FSMContext):
     """Отмена"""
     await state.finish()
     await call.message.answer(f'{warning_em} Вы отменили операцию, но для продолжения нужно будет выбрать локацию.')
-
-
-
