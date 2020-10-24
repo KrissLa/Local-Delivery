@@ -21,6 +21,89 @@ from utils.temp_orders_list import get_list_of_delivery_category, weekdays, get_
     get_list_of_couriers_for_change, get_list_of_delivery_couriers
 
 
+@dp.message_handler(IsAdminMessage(), commands=['first_start'], state=['*'])
+async def first_start(message: types.Message, state: FSMContext):
+    """Первый запуск"""
+    await state.finish()
+    text = [
+        'Список команд: ',
+        '0. Если бот завис и не реагирует на Ваши сообщения - /restart',
+        '1. Нажать при первом запуске, перед добавлением станций метро, локаций, и объектов доставки'
+        ' чтобы бот не ругался на то, что Вы не закреплены за локацией - /first_start\n',
+        'Общие команды:',
+        '2. Получить справку - /help',
+        '3. Корзина - /cart',
+        '4. Показать меню - /menu',
+        '5. Показать статус заказа - /order_status',
+        '6. Показать статус бонусного заказа - /bonus_order_status\n',
+        'Команды админа:',
+        '7. Создать промо пост - /publish_post',
+        '8. Добавить/изменить описание компании - /set_about\n',
+        'Работа с персоналом:',
+        '   Добавление:',
+        '9. Добавть админа - /add_admin',
+        '10. Добавить админа локации - /add_seller_admin',
+        '11. Добавить продавца - /add_seller',
+        '12. Добавить курьера - /add_courier',
+        '13. Добавить курьера оптовых заказов - /add_delivery_courier',
+        '   Удаление:',
+        '14. Удалить админа - /delete_admin',
+        '15. Удалить админа локации - /remove_seller_admin',
+        '16. Удалить продавца - /remove_seller',
+        '17. Удалить курьера - /remove_courier',
+        '18. Удалить курьера оптовых заказов - /remove_delivery_courier',
+        '   Локации персонала:',
+        '19. Открепить админа локации от локации - /reset_seller_admin_location',
+        '20. Открепить продавца от локации - /reset_seller_location',
+        '21. Открепить курьера от локации - /reset_courier_location',
+        '22. Привязать админа локации к другой локации - /change_seller_admin_location',
+        '23. Привязать продавца к другой локации - /change_seller_location',
+        '24. Привязать курьера к другой локации - /change_courier_location\n',
+        'Работа с локациями:',
+        '25. Добавить станцию метро - /add_metro',
+        '26. Добавить точку продаж - /add_newlocation',
+        '27. Добавить объект локальной доставки - /add_local_object',
+        '28. Удалить станцию метро - /delete_metro',
+        '29. Удалить точку продаж - /delete_location',
+        '30. Удалить объект локальной доставки - /remove_local_object',
+        '31. Редактировать метро - /edit_metro\n',
+        'Работа с категориями:',
+        '32. Добавить категорию товара - /add_category',
+        '33. Удалить категорию товара - /remove_category',
+        '34. Убрать категорию из меню - /remove_category_from_stock',
+        '35. Вернуть категорию в меню - /return_category_to_stock\n',
+        'Работа с товарами:',
+        '36. Добавить товар - /add_item',
+        '37. Удалить товар - /remove_item',
+        '38. Убрать товар из меню - /remove_item_from_stock',
+        '39. Вернуть товар в меню - /return_item_to_stock',
+        '40. Редактировать товар - /edit_item\n',
+        'Работа с пользователями:',
+        '41. Заблокировать пользователя - /ban_user',
+        '42. Разблокировать пользователя - /unban_user\n',
+        'Работа с оптовыми товарами:',
+        '43. Добавить новую категорию для оптовых поставок - /add_delivery_category',
+        '44. Добавить новый товар для оптовых поставок - /add_delivery_item',
+        '45. Изменить цену товара для оптовых поставок - /edit_delivery_item_price\n',
+        '46. Удалить категорию для оптовых поставок - /remove_delivery_category',
+        '47. Удалить товар для оптовых поставок - /remove_delivery_item\n',
+        '48. Убрать товар для оптовых поставок из меню - /remove_delivery_item_from_stock',
+        '49. Вернуть товар для оптовых поставок в меню - /return_delivery_item_to_stock\n',
+
+        'Работа с оптовыми заказами:',
+        '50. Принять новые заказы - /take_orders',
+        '51. Заказы, в которых не назначен курьер (Выбрать курьера для доставки заказа) - /delivery_order_set_courier',
+        '52. Список заказов, ожидающих подтверждения курьером - /delivery_orders_awaiting_courier',
+        '53. Список заказов, ожидающих доставки - /delivery_orders_awaiting_delivery\n',
+
+        'Статистика:',
+        '54. Получить статистику - /get_statistics',
+        '55. Получить статистику по оптовым заказам - /get_delivery_statistics',
+        '56. Добавить/изменить email адрес для получения статистики - /update_email',
+    ]
+    await message.answer('\n'.join(text))
+
+
 @dp.message_handler(IsAdminMessage(), commands=['edit_delivery_item_price'], state=states_for_menu)
 @dp.message_handler(IsAdminMessage(), commands=['edit_delivery_item_price'])
 async def edit_delivery_item_price(message: types.Message, state: FSMContext):
