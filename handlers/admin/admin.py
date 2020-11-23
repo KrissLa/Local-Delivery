@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from aiogram import types
@@ -240,6 +241,7 @@ async def send_publish_post(message: types.Message, state: FSMContext):
         except Exception as err:
             logging.error(err)
             count_error += 1
+        await asyncio.sleep(.05)  # 20 messages per second (Limit: 30 messages per second)
     await message.answer(f'Пост отправлен.\n'
                          f'Успешно - {count} сообщений.\n'
                          f'Ошибок - {count_error}.')
