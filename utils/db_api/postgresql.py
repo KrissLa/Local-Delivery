@@ -157,6 +157,12 @@ class Database:
                 lp_location_id INT REFERENCES locations (location_id) ON UPDATE CASCADE ON DELETE CASCADE,
                 lp_product_id INT REFERENCES products (product_id) ON UPDATE CASCADE ON DELETE CASCADE,
                 is_product_in_location_available BOOLEAN NOT NULL DEFAULT true,
+                local_price_1 INT,
+                local_price_2 INT,
+                local_price_3 INT,
+                local_price_4 INT,
+                local_price_5 INT,
+                local_price_6 INT,
                 CONSTRAINT locations_products_pkey PRIMARY KEY (lp_location_id, lp_product_id));
                 """
         await self.pool.execute(sql)
@@ -168,6 +174,12 @@ class Database:
                 lps_location_id INT REFERENCES locations (location_id) ON UPDATE CASCADE ON DELETE CASCADE,
                 lps_size_product_id INT REFERENCES product_sizes (size_id) ON UPDATE CASCADE ON DELETE CASCADE,
                 is_size_product_in_location_available BOOLEAN NOT NULL DEFAULT true,
+                local_price_1 INT,
+                local_price_2 INT,
+                local_price_3 INT,
+                local_price_4 INT,
+                local_price_5 INT,
+                local_price_6 INT,
                 CONSTRAINT locations_size_pkey PRIMARY KEY (lps_location_id, lps_size_product_id));
                 """
         await self.pool.execute(sql)
@@ -621,11 +633,75 @@ class Database:
     WHERE product_id = {product_id}"""
         )
 
+    async def get_product_info_prices(self, product_id, location_id):
+        """Получаем информацию о товаре. Если для локации указаны цены, тогда забираем их"""
+        has_local_price = await self.pool.fetchval(f"""
+            SELECT local_price_1 FROM locations_products 
+			WHERE lp_product_id={product_id}
+			and lp_location_id={location_id}
+    """)
+        if has_local_price:
+            return await self.pool.fetchrow(f"""
+    SELECT product_id, product_category_id, product_name, product_photo_id, local_price_1, local_price_2, local_price_3,
+    local_price_4, local_price_5, local_price_6
+    FROM products 
+    join locations_products on lp_product_id = product_id
+    WHERE product_id = {product_id}
+    and lp_location_id = {location_id}""")
+        else:
+            return await self.pool.fetchrow(f"""
+    SELECT product_id, product_category_id, product_name, product_photo_id, price_1, price_2, price_3, price_4, price_5,
+    price_6
+    FROM products 
+    WHERE product_id = {product_id}""")
+
+    async def get_size_info_prices(self, size_id, location_id):
+        """
+        Получаем информацию о размере товара.
+        Если для локации указаны цены, тогда забираем их.
+        """
+        has_local_price = await self.pool.fetchval(f"""
+    SELECT local_price_1 
+    FROM locations_product_sizes
+    WHERE lps_size_product_id = {size_id}
+    AND lps_location_id = {location_id}
+    """)
+        if has_local_price:
+            return await self.pool.fetchrow(f"""
+    SELECT product_id, size_id, product_category_id, product_name, size_name, product_photo_id, local_price_1, local_price_2, local_price_3,
+    local_price_4, local_price_5, local_price_6
+    FROM products 
+	join product_sizes on size_product_id = product_id
+    join locations_product_sizes on lps_size_product_id = size_id
+	where lps_location_id = {location_id}
+	and lps_size_product_id = {size_id}
+    """)
+        else:
+            return await self.pool.fetchrow(f"""
+    SELECT product_id, size_id, product_category_id, product_name, size_name, product_photo_id, product_sizes.price_1, 
+    product_sizes.price_2, product_sizes.price_3, 
+    product_sizes.price_4, product_sizes.price_5, product_sizes.price_6
+    FROM products 
+    join product_sizes on size_product_id = product_id
+    and size_id = {size_id}
+    """)
+
+
+
     async def get_product_sizes(self, product_id):
         """Получаем размеры товара"""
         return await self.pool.fetch(
             f"""
     SELECT * 
+    FROM product_sizes 
+    WHERE size_product_id = {product_id}"""
+        )
+
+    async def get_product_sizes_ids_names(self, product_id):
+        """Получаем размеры товара"""
+        return await self.pool.fetch(
+            f"""
+    SELECT size_id, size_name
     FROM product_sizes 
     WHERE size_product_id = {product_id}"""
         )
@@ -698,7 +774,7 @@ class Database:
                     prod_result.append(prod)
         return prod_result
 
-    async def get_product_info_by_id(self, product_id, user_id):
+    async def get_product_info_by_id(self, product_id, user_id, location_id):
         """Получаем подробную информацию о товаре"""
         sql = f"""
     SELECT product_category_id, product_name, product_description, product_photo_id, price_1, 
@@ -706,41 +782,93 @@ class Database:
     from products 
     where product_id = {product_id};
     """
-        sql2 = f"""
-    SELECT product_sizes.size_id, product_sizes.size_name, product_sizes.price_1, product_sizes.size_product_id
-    FROM locations_product_sizes 
-    JOIN product_sizes ON locations_product_sizes.lps_size_product_id=product_sizes.size_id
-    WHERE product_sizes.size_product_id = {product_id}
-    AND locations_product_sizes.lps_location_id = (SELECT user_location_id FROM users WHERE user_telegram_id = {user_id})
-    AND product_sizes.is_size_available = true
-    AND locations_product_sizes.is_size_product_in_location_available=true
-    ORDER BY size_product_id;
-    """
+
         sql3 = f"""
     SELECT product_category_id, product_name, product_description, product_photo_id 
     from products 
     where product_id = {product_id};
     """
+
+        sql4 = f"""
+    SELECT product_category_id, product_name, product_description, product_photo_id, local_price_1, 
+            local_price_2, local_price_3, local_price_4, local_price_5, local_price_6 
+    from products 
+    join locations_products on lp_product_id = product_id
+    where product_id = {product_id}
+    and lp_location_id = {location_id};"""
+
+        sql_5 = f"""
+    SELECT size_id FROM product_sizes where size_product_id = {product_id} order by size_id"""
+
         if await self.pool.fetchval(
                 f"SELECT NOT EXISTS(SELECT size_product_id FROM product_sizes WHERE size_product_id = {product_id});"):
-
-            result = await self.pool.fetchrow(sql)
+            if await self.pool.fetchval(f"""SELECT local_price_1 
+                                            from locations_products 
+                                            where lp_location_id = {location_id}
+                                            and lp_product_id = {product_id}""") is not None:
+                result = await self.pool.fetchrow(sql4)
+            else:
+                result = await self.pool.fetchrow(sql)
         else:
+            list_of_size = []
+            size_ids = await self.pool.fetch(sql_5)
+            logging.info(size_ids)
+            for size in size_ids:
+                size_price = await self.pool.fetchval(f"""SELECT local_price_1
+                                                FROM locations_product_sizes
+                                                where lps_size_product_id = {size["size_id"]}
+                                                and lps_location_id = {location_id}""")
+                if size_price is not None:
+                    info = await self.pool.fetchrow(f"""
+    SELECT product_sizes.size_id, product_sizes.size_name, locations_product_sizes.local_price_1, product_sizes.size_product_id
+    FROM locations_product_sizes 
+    JOIN product_sizes ON locations_product_sizes.lps_size_product_id=product_sizes.size_id
+    WHERE product_sizes.size_product_id = {product_id}
+    AND locations_product_sizes.lps_location_id = {location_id}
+    AND product_sizes.is_size_available = true
+    AND locations_product_sizes.is_size_product_in_location_available=true
+	and product_sizes.size_id = {size["size_id"]}
+    ORDER BY size_product_id;""")
+                else:
+                    info = await self.pool.fetchrow(f"""
+    SELECT product_sizes.size_id, product_sizes.size_name, product_sizes.price_1, product_sizes.size_product_id
+    FROM locations_product_sizes 
+    JOIN product_sizes ON locations_product_sizes.lps_size_product_id=product_sizes.size_id
+    WHERE product_sizes.size_product_id = {product_id}
+    AND locations_product_sizes.lps_location_id = {location_id}
+    AND product_sizes.is_size_available = true
+    AND locations_product_sizes.is_size_product_in_location_available=true
+	and product_sizes.size_id = {size["size_id"]}
+    ORDER BY size_product_id;""")
+                list_of_size.append(info)
+
             result = {
                 'product_info': await self.pool.fetchrow(sql3),
-                'list_of_sizes': await self.pool.fetch(sql2)
+                'list_of_sizes': list_of_size
             }
-
         return result
 
-    async def get_size_info(self, size_id):
+    async def get_size_info(self, size_id, location_id):
         """Получаем информацию о размере"""
-        return await self.pool.fetchrow(
-            f"""
-    SELECT size_name, size_product_id, price_1, price_2, price_3, price_4, price_5, price_6 
-    from product_sizes 
-    where size_id = {size_id}"""
-        )
+        if await self.pool.fetchval(f"""SELECT local_price_1
+                                                       FROM locations_product_sizes
+                                                       where lps_size_product_id = {size_id}
+                                                       and lps_location_id = {location_id}""") is not None:
+            return await self.pool.fetchrow(
+                f"""
+        SELECT size_name, size_product_id, local_price_1, local_price_2, local_price_3, local_price_4, local_price_5, local_price_6 
+        from product_sizes 
+		join locations_product_sizes on lps_size_product_id = size_id
+        where size_id = {size_id}
+		and lps_location_id = {location_id}"""
+            )
+        else:
+            return await self.pool.fetchrow(
+                f"""
+        SELECT size_name, size_product_id, price_1, price_2, price_3, price_4, price_5, price_6 
+        from product_sizes 
+        where size_id = {size_id}"""
+            )
 
     async def get_product_name(self, product_id):
         """Получаем название товара"""
@@ -3950,6 +4078,26 @@ class Database:
     SET is_product_in_location_available=true 
     WHERE lp_product_id = {product_id} 
     AND lp_location_id={location_id}""")
+
+    async def update_product_prices_in_location(self, product_id, location_id, prices):
+        """ Обновляем цены товара в локации """
+        await self.pool.execute(f"""
+    UPDATE locations_products
+    SET local_price_1 = {prices['price_1']}, local_price_2 = {prices['price_2']}, local_price_3 = {prices['price_3']},
+    local_price_4 = {prices['price_4']}, local_price_5 = {prices['price_5']}, local_price_6 = {prices['price_6']}
+    WHERE lp_product_id = {product_id}
+    AND lp_location_id = {location_id}""")
+
+    async def update_product_size_prices_in_location(self, size_id, location_id, prices):
+        """
+        Обновляем цены размера товара в локации
+        """
+        await self.pool.execute(f"""
+    UPDATE locations_product_sizes
+    SET local_price_1 = {prices['price_1']}, local_price_2 = {prices['price_2']}, local_price_3 = {prices['price_3']},
+    local_price_4 = {prices['price_4']}, local_price_5 = {prices['price_5']}, local_price_6 = {prices['price_6']}
+    WHERE lps_size_product_id = {size_id}
+    AND lps_location_id = {location_id}""")
 
     async def update_email(self, email, user_id):
         """Обновляем емайл"""

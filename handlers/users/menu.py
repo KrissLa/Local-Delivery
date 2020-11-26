@@ -59,7 +59,8 @@ async def send_product_info(call: CallbackQuery, callback_data: dict, state: FSM
         Если нет, сразу предлагаем выбрать количество"""
     await call.message.edit_reply_markup()
     product_id = int(callback_data.get('product_id'))
-    product_info = await db.get_product_info_by_id(product_id, call.from_user.id)
+    location_id = await db.get_user_location_id(call.from_user.id)
+    product_info = await db.get_product_info_by_id(product_id, call.from_user.id, location_id)
     if len(product_info) == 10:
         order_detail = {
             'product_id': int(product_id),
@@ -89,7 +90,8 @@ async def get_product_size(call: CallbackQuery, callback_data: dict, state: FSMC
     """Получаем размер товара"""
     product_id = int(callback_data.get('product_id'))
     size_id = int(callback_data.get('size_id'))
-    size_info = await db.get_size_info(size_id)
+    location_id = await db.get_user_location_id(call.from_user.id)
+    size_info = await db.get_size_info(size_id, location_id)
     product_name = await db.get_product_name(product_id)
     prod_size_name = f'{product_name}, {size_info["size_name"]}'
     order_detail = {
@@ -257,8 +259,7 @@ async def set_pickup(call: CallbackQuery, state: FSMContext):
                                   f' из меню.')
 
 
-@dp.callback_query_handler(text='back', state=[Menu.WaitPass,
-                                               Menu.WaitNewAddress])
+@dp.callback_query_handler(text='back', state=[Menu.WaitPass])   ### Убрал лишний стейт ###
 @dp.callback_query_handler(text='delivery_option_delivery', state=Menu.OneMoreOrNext)
 async def set_delivery(call: CallbackQuery, state: FSMContext):
     """Пользователь выбирает с доставкой"""

@@ -135,6 +135,8 @@ async def set_change_profile_without_address(call: CallbackQuery, state: FSMCont
                                               loc_data['local_object_location_id'],
                                               local_object_id
                                               )
+    await db.clear_cart(call.from_user.id)
+    await db.clear_empty_orders(call.from_user.id)
     await call.message.answer("Данные профиля обновлены.\n"
                               f"User ID: {call.from_user.id}\n"
                               f"Адрес доставки: {loc_data['local_object_name']}\n"
@@ -163,6 +165,8 @@ async def set_change_profile(message: types.Message, state: FSMContext):
                               local_object_id,
                               message.text
                               )
+    await db.clear_cart(message.from_user.id)
+    await db.clear_empty_orders(message.from_user.id)
     await message.answer("Данные профиля обновлены.\n"
                          f"User ID: {message.from_user.id}\n"
                          f"Адрес доставки: {loc_data['local_object_name']}\n"

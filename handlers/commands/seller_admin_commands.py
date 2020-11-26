@@ -7,7 +7,8 @@ from aiogram.dispatcher import FSMContext
 
 from filters.users_filters import IsSellerAdminMessage, SellerAdminHasLocationMessage
 from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_keyboard_with_delivery_categories, \
-    generate_keyboard_with_none_categories, generate_keyboard_with_categories_for_add_item
+    generate_keyboard_with_none_categories, generate_keyboard_with_categories_for_add_item, \
+    generate_keyboard_with_categories
 from keyboards.inline.statistics_keyboards import period_markup, generate_locations_keyboard_del, \
     generate_delivery_period_keyboard
 from loader import dp, db, bot
@@ -206,7 +207,6 @@ async def get_email(message: types.Message, state: FSMContext):
     await SellerAdmin.Email.set()
 
 
-
 @dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['get_statistics'], state='*')
 async def get_statistics(message: types.Message, state: FSMContext):
     """Получить статистику"""
@@ -220,7 +220,8 @@ async def get_statistics(message: types.Message, state: FSMContext):
             ' email адрес - /update_email')
 
 
-@dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['get_delivery_statistics'], state='*')
+@dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['get_delivery_statistics'],
+                    state='*')
 async def get_statistics(message: types.Message, state: FSMContext):
     """Получить статистику"""
     await reset_state(state, message)
@@ -233,3 +234,17 @@ async def get_statistics(message: types.Message, state: FSMContext):
         await message.answer(
             f'{warning_em} Статистика будет отправлена на email. Чтобы получить статистику Вам сначала нужно ввести'
             ' email адрес - /update_email')
+
+
+@dp.message_handler(IsSellerAdminMessage(), SellerAdminHasLocationMessage(), commands=['edit_item_price_in_location'],
+                    state='*')
+async def edit_item_price_in_location(message: types.Message, state: FSMContext):
+    """Команда для изменения цены товара в локации админом локации"""
+    await reset_state(state, message)
+    categories = await db.get_list_of_categories_with_items()
+    if categories:
+        await message.answer(f'Выберите категорию, в которой находится товар.',
+                             reply_markup=await generate_keyboard_with_categories(categories))
+        await SellerAdmin.EditItemPriceCommand.set()
+    else:
+        await message.answer(f'{error_em} Нет доступных категорий.')

@@ -23,6 +23,8 @@ confirm_order_seller_data = CallbackData('confirm_order_seller', 'order_id', 'st
 
 size_product_data = CallbackData('size_product', 'size_id', 'product_id')
 
+size_data = CallbackData('edit_size_price', 'size_id')
+
 back_to_product_list_data = CallbackData('back_to_product', 'category_id')
 
 back_to_product_from_sizes_list_data = CallbackData('back_to_product_f', 'category_id')

@@ -615,6 +615,7 @@ async def get_item_description(message: types.Message, state: FSMContext):
                                                AddAdmin.ItemSizeConfirmFirst])
 async def back_to_sizes_or_not(call: CallbackQuery, state: FSMContext):
     """Возврат к выбору один размер или несколько"""
+    # await call.message.edit_reply_markup()
     data = await state.get_data()
     product_id = data.get('product_id')
     await db.delete_product_by_id(product_id)
@@ -875,7 +876,7 @@ async def get_item_price(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(text='save_item', state=AddAdmin.ItemConfirm)
 async def save_item_without_size(call: CallbackQuery, state: FSMContext):
     """Сохраняем товар"""
-    # await call.message.edit_reply_markup()
+    await call.message.edit_reply_markup()
     data = await state.get_data()
     new_item = data.get('new_item')
     await db.add_product(new_item)

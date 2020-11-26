@@ -1,3 +1,5 @@
+import logging
+
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 
@@ -82,7 +84,8 @@ async def back_to_size(call: CallbackQuery, callback_data: dict, state: FSMConte
     """Назад к выбору размера товара"""
     await call.message.edit_reply_markup()
     product_id = int(callback_data.get('product_id'))
-    product_info = await db.get_product_info_by_id(product_id, call.from_user.id)
+    location_id = await db.get_user_location_id(call.from_user.id)
+    product_info = await db.get_product_info_by_id(product_id, call.from_user.id, location_id)
     await bot.send_photo(chat_id=call.from_user.id,
                          photo=product_info['product_info']['product_photo_id'],
                          caption=product_info['product_info']['product_description'])
@@ -105,7 +108,8 @@ async def back_to_quantity(call: CallbackQuery, state: FSMContext):
     order_id = product_data['temp_order_id']
     size_id = product_data['size_id']
     await state.update_data(order_id=order_id)
-    product_info = await db.get_product_info_by_id(product_id, call.from_user.id)
+    location_id = await db.get_user_location_id(call.from_user.id)
+    product_info = await db.get_product_info_by_id(product_id, call.from_user.id, location_id)
     if not size_id:
         await bot.send_photo(chat_id=call.from_user.id,
                              photo=product_info['product_photo_id'],
@@ -124,7 +128,7 @@ async def back_to_quantity(call: CallbackQuery, state: FSMContext):
         await Menu.WaitQuantityBackWithSize.set()
 
 
-@dp.callback_query_handler(text='back', state=[Menu.WaitTime, Menu.WaitAddress])
+@dp.callback_query_handler(text='back', state=[Menu.WaitTime, Menu.WaitAddress, Menu.WaitNewAddress])
 async def back_to_one_more_or_next(call: CallbackQuery, state: FSMContext):
     """Возврат к меню выбора способа доставки"""
     await call.message.edit_reply_markup()

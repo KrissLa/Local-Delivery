@@ -11,8 +11,9 @@ from keyboards.inline.callback_datas import metro_data, categories_data, product
     delivery_categories_data, delivery_product_data, delivery_product_count_data, delivery_date_data, \
     delivery_time_data, take_delivery_order, dont_take_delivery_order, confirm_delivery_order, active_order_cancel_data, \
     cancel_bonus_order_data_sellers, delivery_couriers_data, cancel_courier_data, courier_confirm_data, \
-    courier_confirm_changes
+    courier_confirm_changes, size_data
 from loader import db
+from utils.get_prices import get_price_list
 from utils.pagination import add_pagination
 from utils.temp_orders_list import get_formatted_date
 
@@ -524,14 +525,36 @@ async def generate_keyboard_with_none_products():
     return products_markup
 
 
+async def generate_keyboard_with_product_sizes(sizes, category_id):
+    """Генерируем клавиатуру с размерами"""
+    size_markup = InlineKeyboardMarkup()
+    for size in sizes:
+        button = InlineKeyboardButton(
+            text=f"{size['size_name']}",
+            callback_data=size_data.new(size_id=size['size_id'])
+        )
+        size_markup.add(button)
+    size_markup.add(InlineKeyboardButton(
+        text='Назад',
+        callback_data=categories_data.new(category_id=category_id)
+    ))
+    return size_markup
+
+
 async def generate_keyboard_with_sizes(sizes_list, category_id):
     """Генерируем клавиатуру с доступными размерами"""
     sizes_markup = InlineKeyboardMarkup()
     for size in sizes_list:
-        button = InlineKeyboardButton(
-            text=f"{size['size_name']} - {size['price_1']} руб",
-            callback_data=size_product_data.new(size_id=size['size_id'], product_id=size['size_product_id'])
-        )
+        try:
+            button = InlineKeyboardButton(
+                text=f"{size['size_name']} - {size['price_1']} руб",
+                callback_data=size_product_data.new(size_id=size['size_id'], product_id=size['size_product_id'])
+            )
+        except Exception:
+            button = InlineKeyboardButton(
+                text=f"{size['size_name']} - {size['local_price_1']} руб",
+                callback_data=size_product_data.new(size_id=size['size_id'], product_id=size['size_product_id'])
+            )
         sizes_markup.add(button)
     sizes_markup.add(InlineKeyboardButton(
         text='Назад',
@@ -542,41 +565,42 @@ async def generate_keyboard_with_sizes(sizes_list, category_id):
 
 async def generate_keyboard_with_count_and_prices(product_info):
     """Генерируем клавиатуру с количеством товара и ценами"""
+    prices = get_price_list(product_info)
     products_count_price_markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=f"1 по {product_info['price_1']} руб.",
+                    text=f"1 по {prices['price_1']} руб.",
                     callback_data=product_count_price_data.new(quantity=1,
-                                                               price=product_info['price_1'])
+                                                               price=prices['price_1'])
                 ),
                 InlineKeyboardButton(
-                    text=f"2 по {product_info['price_2']} руб.",
+                    text=f"2 по {prices['price_2']} руб.",
                     callback_data=product_count_price_data.new(quantity=2,
-                                                               price=product_info['price_2'])
+                                                               price=prices['price_2'])
                 ),
                 InlineKeyboardButton(
-                    text=f"3 по {product_info['price_3']} руб.",
+                    text=f"3 по {prices['price_3']} руб.",
                     callback_data=product_count_price_data.new(quantity=3,
-                                                               price=product_info['price_3'])
+                                                               price=prices['price_3'])
                 )
             ],
 
             [
                 InlineKeyboardButton(
-                    text=f"4 по {product_info['price_4']} руб.",
+                    text=f"4 по {prices['price_4']} руб.",
                     callback_data=product_count_price_data.new(quantity=4,
-                                                               price=product_info['price_4'])
+                                                               price=prices['price_4'])
                 ),
                 InlineKeyboardButton(
-                    text=f"5 по {product_info['price_5']} руб.",
+                    text=f"5 по {prices['price_5']} руб.",
                     callback_data=product_count_price_data.new(quantity=5,
-                                                               price=product_info['price_5'])
+                                                               price=prices['price_5'])
                 ),
                 InlineKeyboardButton(
-                    text=f"6+ по {product_info['price_6']} руб.",
+                    text=f"6+ по {prices['price_6']} руб.",
                     callback_data=product_count_price_data.new(quantity=6,
-                                                               price=product_info['price_6'])
+                                                               price=prices['price_6'])
                 )
             ],
             [
@@ -643,41 +667,42 @@ async def generate_keyboard_with_counts_for_delivery_products(price, category_id
 
 async def generate_keyboard_with_count_and_prices_for_size(size_info, product_id):
     """Генерируем клавиатуру с количеством товара и ценами"""
+    prices = get_price_list(size_info)
     products_count_price_markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=f"1 по {size_info['price_1']} руб.",
+                    text=f"1 по {prices['price_1']} руб.",
                     callback_data=product_count_price_data.new(quantity=1,
-                                                               price=size_info['price_1'])
+                                                               price=prices['price_1'])
                 ),
                 InlineKeyboardButton(
-                    text=f"2 по {size_info['price_2']} руб.",
+                    text=f"2 по {prices['price_2']} руб.",
                     callback_data=product_count_price_data.new(quantity=2,
-                                                               price=size_info['price_2'])
+                                                               price=prices['price_2'])
                 ),
                 InlineKeyboardButton(
-                    text=f"3 по {size_info['price_3']} руб.",
+                    text=f"3 по {prices['price_3']} руб.",
                     callback_data=product_count_price_data.new(quantity=3,
-                                                               price=size_info['price_3'])
+                                                               price=prices['price_3'])
                 )
             ],
 
             [
                 InlineKeyboardButton(
-                    text=f"4 по {size_info['price_4']} руб.",
+                    text=f"4 по {prices['price_4']} руб.",
                     callback_data=product_count_price_data.new(quantity=4,
-                                                               price=size_info['price_4'])
+                                                               price=prices['price_4'])
                 ),
                 InlineKeyboardButton(
-                    text=f"5 по {size_info['price_5']} руб.",
+                    text=f"5 по {prices['price_5']} руб.",
                     callback_data=product_count_price_data.new(quantity=5,
-                                                               price=size_info['price_5'])
+                                                               price=prices['price_5'])
                 ),
                 InlineKeyboardButton(
-                    text=f"6+ по {size_info['price_6']} руб.",
+                    text=f"6+ по {prices['price_6']} руб.",
                     callback_data=product_count_price_data.new(quantity=6,
-                                                               price=size_info['price_6'])
+                                                               price=prices['price_6'])
                 )
             ],
             [
@@ -904,6 +929,21 @@ confirm_item_markup = InlineKeyboardMarkup(inline_keyboard=[
         )
     ]
 
+])
+
+confirm_edit_item_price_markup = InlineKeyboardMarkup(inline_keyboard=[
+    [
+        InlineKeyboardButton(
+            text='Сохранить',
+            callback_data='save_new_prices'
+        )
+    ],
+    [
+        InlineKeyboardButton(
+            text='Назад',
+            callback_data='back'
+        )
+    ]
 ])
 
 back_to_choices_sizes = InlineKeyboardMarkup(inline_keyboard=[

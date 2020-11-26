@@ -46,3 +46,11 @@ class SellerAdmin(StatesGroup):
     Day = State()
 
     Email = State()
+
+    EditItemPriceCommand = State()
+    EditItemPriceCategory = State()
+    EditItemPriceProduct = State()
+    EditItemPriceProductPrice = State()
+    EditItemPriceProductPriceConfirm = State()
+    EditItemPriceProductSizePrice = State()
+    EditItemPriceProductSizePriceConfirm = State()

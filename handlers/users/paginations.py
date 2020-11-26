@@ -130,6 +130,14 @@ async def get_category_pagination_list(call: CallbackQuery, callback_data: dict)
     await call.message.edit_reply_markup(await generate_keyboard_with_categories(category_list, page))
 
 
+@dp.callback_query_handler(page_call_data.filter(), state=SellerAdmin.EditItemPriceCommand)
+async def get_category_pagination_list(call: CallbackQuery, callback_data: dict):
+    """Пагинация списка категорий"""
+    category_list = await db.get_list_of_categories_with_items()
+    page = int(callback_data.get('page'))
+    await call.message.edit_reply_markup(await generate_keyboard_with_categories(category_list, page))
+
+
 @dp.callback_query_handler(page_call_data.filter(), state=AddAdmin.RemoveItemFromStockCategory)
 async def get_category_pagination_list(call: CallbackQuery, callback_data: dict):
     """Пагинация списка категорий"""
@@ -190,6 +198,16 @@ async def get_product_pagination_list(call: CallbackQuery, callback_data: dict, 
     data = await state.get_data()
     category_id = data.get('category_id')
     products = await db.get_product_for_user_location_id(call.from_user.id, category_id)
+    page = int(callback_data.get('page'))
+    await call.message.edit_reply_markup(await generate_keyboard_with_products(products, page))
+
+
+@dp.callback_query_handler(page_call_data.filter(), state=SellerAdmin.EditItemPriceCategory)
+async def get_product_pagination_list(call: CallbackQuery, callback_data: dict, state: FSMContext):
+    """Пагинация списка товаров в категории при изменения цены товара в локации"""
+    data = await state.get_data()
+    category_id = data.get('category_id')
+    products = await db.get_products_list(category_id)
     page = int(callback_data.get('page'))
     await call.message.edit_reply_markup(await generate_keyboard_with_products(products, page))
 

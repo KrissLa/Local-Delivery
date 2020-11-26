@@ -116,13 +116,14 @@ async def bot_help(message: types.Message, state: FSMContext):
         '11. Вернуть категорию в меню - /return_category_to_stock',
         '12. Убрать товар из меню - /remove_item_from_stock',
         '13. Вернуть товар в меню - /return_item_to_stock\n',
+        '14. Изменить стоимость товара в локации - /edit_item_price_in_location\n',
         'Работа с оптовыми заказами:',
-        '14. Создать новый заказ на поставку - /new_delivery_order',
-        '15. Посмотреть/изменить/отменить заказы на поставку - /change_delivery_order\n',
+        '15. Создать новый заказ на поставку - /new_delivery_order',
+        '16. Посмотреть/изменить/отменить заказы на поставку - /change_delivery_order\n',
         'Статистика:',
-        '16. Получить статистику - /get_statistics',
-        '17. Получить статистику по оптовым заказам - /get_delivery_statistics',
-        '18. Добавить/изменить email адрес для получения статистики - /update_email',
+        '17. Получить статистику - /get_statistics',
+        '18. Получить статистику по оптовым заказам - /get_delivery_statistics',
+        '19. Добавить/изменить email адрес для получения статистики - /update_email',
     ]
     await message.answer('\n'.join(text))
 
