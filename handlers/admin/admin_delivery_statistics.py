@@ -23,7 +23,6 @@ from utils.statistics import send_admin_delivery_statistics
 @dp.callback_query_handler(text='back_to_statistics_seller', state='*')
 async def back(call: CallbackQuery, state: FSMContext):
     """back"""
-    print('sdkfsdm fsdm lfmsd fmpsd mfpsd')
     location_id = await db.get_seller_admin_location(call.from_user.id)
     await call.message.answer('Выберите локацию, по которой хотите получить статистику',
                               reply_markup=await generate_delivery_period_keyboard(location_id, admin=False))

@@ -1,7 +1,6 @@
 import logging
 
 from aiogram import types
-from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 
 from filters.users_filters import IsAdminMessage
@@ -131,7 +130,6 @@ async def remove_delivery_item_from_stock_by_id(message: types.Message):
         logging.error(err)
         await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
-
 
 
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.ReturnDeliveryItemToStockCategory)

@@ -16,14 +16,8 @@ from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_key_
 from loader import dp, bot, db
 from states.admin_state import AddAdmin
 from utils.emoji import attention_em, attention_em_red, error_em, success_em
-from utils.temp_orders_list import get_sizes, get_list_of_products, get_list_of_products_for_remove_from_stock, \
-    get_list_of_products_for_return_to_stock, \
-    get_list_of_products_for_edit, get_sizes_for_remove, get_sizes_for_edit, get_list_of_delivery_products, \
-    get_list_of_delivery_products_for_remove_from_stock, \
-    get_list_of_delivery_products_for_return_to_stock, get_list_of_delivery_products_for_edit
-
-
-
+from utils.temp_orders_list import get_sizes, get_list_of_products, get_list_of_products_for_edit, get_sizes_for_remove, \
+    get_sizes_for_edit, get_list_of_delivery_products
 
 
 @dp.callback_query_handler(categories_data.filter(), state=AddAdmin.RemoveDeliveryItemCat)
@@ -55,7 +49,6 @@ async def remove_item_by_id(message: types.Message, state: FSMContext):
         logging.error(err)
         await message.answer(f'{error_em} Неизвестная команда',
                              reply_markup=cancel_admin_markup)
-
 
 
 @dp.message_handler(IsAdminMessage(), regexp="remove_delivery_category_by_id_\d+",

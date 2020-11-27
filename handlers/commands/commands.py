@@ -4,7 +4,6 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from filters.users_filters import IsAdminMessage
 from keyboards.default.menu import menu_keyboard
 from keyboards.inline.callback_datas import bonuses_data, cancel_bonus_order_data
 from keyboards.inline.inline_keyboards import generate_keyboard_with_categories, generate_keyboard_with_none_categories, \

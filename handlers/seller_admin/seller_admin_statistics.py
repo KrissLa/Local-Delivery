@@ -28,8 +28,9 @@ async def run_blocking_tasks(data):
     if mail_was_send:
         await bot.send_message(data['user_id'], f"{success_em} Статистика отправлена Вам на почту {data['to_email']}.")
     else:
-        await bot.send_message(data['user_id'], f"{error_em} Не удалось отправить статистику по адресу {data['to_email']}."
-                                                f" Проверьте e-mail адрес и попробуйте еще раз.")
+        await bot.send_message(data['user_id'],
+                               f"{error_em} Не удалось отправить статистику по адресу {data['to_email']}."
+                               f" Проверьте e-mail адрес и попробуйте еще раз.")
 
 
 @dp.callback_query_handler(text='cancel_statistics', state='*')
@@ -971,7 +972,7 @@ async def get_statistics(call: CallbackQuery, state: FSMContext):
     years = await db.get_orders_years()
     await call.message.answer('Выберите год',
                               reply_markup=await gen_years_keyboard(years))
-    if await state.get_state() in  ['AddAdmin:Statistics', 'AddAdmin:LocDay']:
+    if await state.get_state() in ['AddAdmin:Statistics', 'AddAdmin:LocDay']:
         await AddAdmin.LocDay.set()
     else:
         await SellerAdmin.Day.set()
@@ -1079,9 +1080,6 @@ async def get_statistics_by_day(call: CallbackQuery, callback_data: dict, state:
     }
 
     await run_blocking_tasks(data)
-
-
-
 
 
 @dp.callback_query_handler(text='cancek_delivery_stat', state='*')

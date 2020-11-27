@@ -1,5 +1,3 @@
-import logging
-
 from keyboards.default.menu import menu_keyboard
 from loader import db
 
@@ -9,7 +7,7 @@ states_for_menu = '*'
 async def reset_state(state, message):
     """обрабатываем выход из меню"""
     if await state.get_state() in ['Menu:OrderStatus', 'Menu:WaitReasonUser', 'SelectCourier:WaitReasonCourier',
-                                     'SelectCourier:WaitReason', 'SelectCourier:WaitReasonActive']:
+                                   'SelectCourier:WaitReason', 'SelectCourier:WaitReasonActive']:
         await state.finish()
         await message.answer('Заказ не отменен',
                              reply_markup=menu_keyboard)

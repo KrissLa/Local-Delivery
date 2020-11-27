@@ -1,5 +1,7 @@
 from aiogram import executor
 
+import filters
+import middlewares
 from data.config import admins
 from handlers import dp
 from loader import db
@@ -8,8 +10,6 @@ from utils.set_bot_commands import set_default_commands
 
 
 async def on_startup(dp):
-    import filters
-    import middlewares
     filters.setup(dp)
     middlewares.setup(dp)
 

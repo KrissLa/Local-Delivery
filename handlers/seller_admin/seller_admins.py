@@ -1,32 +1,17 @@
 import logging
-from datetime import datetime, time, date
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from pytz import timezone
+from aiogram.types import CallbackQuery
 
 from filters.users_filters import IsSellerAdminMessage
-from keyboards.inline.callback_datas import categories_data, delivery_categories_data, delivery_product_data, \
-    back_to_product_list_data, delivery_product_count_data, remove_from_cart_data, delivery_date_data, \
-    delivery_time_data
-from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_keyboard_with_none_categories, \
-    generate_keyboard_with_delivery_categories, \
-    generate_keyboard_with_none_products, generate_keyboard_with_delivery_products, \
-    generate_keyboard_with_counts_for_delivery_products, add_delivery_order_markup, get_markup_with_date, time_markup, \
-    confirm_delivery_order_markup, change_delivery_order_markup, change_and_cancel_delivery_order_markup, \
-    get_markup_with_date_change, generate_time_markup, confirm_changes_markup, confirm_cancel_delivery
+from keyboards.inline.callback_datas import categories_data
+from keyboards.inline.inline_keyboards import cancel_admin_markup
 from loader import dp, db, bot
 from states.seller_admin_states import SellerAdmin
-from utils.emoji import attention_em_red, attention_em, warning_em, error_em, success_em
-from utils.send_messages import send_delivery_cart
+from utils.emoji import attention_em_red, attention_em, error_em, success_em
 from utils.statistics import send_confirm_mail
-from utils.temp_orders_list import get_list_of_products_for_remove_from_stock, get_list_of_products_for_return_to_stock, \
-    get_final_delivery_price, \
-    get_temp_delivery_orders_list_message, get_list_of_delivery_orders, get_delivery_order_info_message, weekdays
-
-
-
+from utils.temp_orders_list import get_list_of_products_for_remove_from_stock, get_list_of_products_for_return_to_stock
 
 
 # @dp.callback_query_handler(back_to_product_list_data.filter(), state=SellerAdmin.DeliveryQuantity)

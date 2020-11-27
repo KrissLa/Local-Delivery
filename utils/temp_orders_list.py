@@ -1,9 +1,6 @@
-import logging
+from datetime import timedelta
 
 from loader import db
-from pytz import timezone
-from datetime import datetime, timedelta
-
 from utils.emoji import attention_em, warning_em, blue_diamond_em
 from utils.product_list import get_delivery_product_list
 

@@ -116,7 +116,7 @@ async def get_courier(call: CallbackQuery, callback_data: dict, state: FSMContex
 @dp.callback_query_handler(dont_take_delivery_order.filter(), state=[AddAdmin.TakeOrders,
                                                                      AddAdmin.ConfirmDeliveryOrders])
 async def take_order_cancel(call: CallbackQuery, callback_data: dict, state: FSMContext):
-    """Отклонить заказ заказ"""
+    """Отклонить заказ"""
     await call.message.edit_reply_markup()
     order_id = int(callback_data.get('order_id'))
     await state.update_data(order_id=order_id)

@@ -1,7 +1,5 @@
 import logging
-import os
 
-import xlsxwriter
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 
@@ -9,16 +7,13 @@ from filters.users_filters import IsSellerAdminMessage, SellerAdminHasLocationMe
 from keyboards.inline.inline_keyboards import cancel_admin_markup, generate_keyboard_with_delivery_categories, \
     generate_keyboard_with_none_categories, generate_keyboard_with_categories_for_add_item, \
     generate_keyboard_with_categories
-from keyboards.inline.statistics_keyboards import period_markup, generate_locations_keyboard_del, \
-    generate_delivery_period_keyboard
-from loader import dp, db, bot
+from keyboards.inline.statistics_keyboards import period_markup, generate_delivery_period_keyboard
+from loader import dp, db
 from states.seller_admin_states import SellerAdmin
 from utils.check_states import states_for_menu, reset_state
-from utils.emoji import attention_em_red, warning_em, success_em, error_em
-from utils.statistics import send_email, send_confirm_mail
+from utils.emoji import attention_em_red, warning_em, error_em
 from utils.temp_orders_list import get_list_of_delivery_orders, get_list_of_sellers_location, \
     get_list_of_couriers_location, get_list_of_category_for_remove_from_stock, get_list_of_category_for_return_to_stock
-from utils.test import generate_table
 
 
 @dp.message_handler(IsSellerAdminMessage(), commands=['change_delivery_order'], state=states_for_menu)
