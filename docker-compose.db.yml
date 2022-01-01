@@ -1,0 +1,30 @@
+version: '3.1'
+
+services:
+  db:
+    image: postgres:11
+    environment:
+      TZ: Europe/Minsk
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+    volumes:
+      - ../data/redis:/data
+    env_file:
+      - ".env"
+    entrypoint: redis-server --requirepass $REDIS_PASS
+    restart: always
+
+
+volumes:
+  pgdata:

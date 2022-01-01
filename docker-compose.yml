@@ -10,8 +10,12 @@ services:
     env_file:
       - ".env"
     # bot start after load db
+    depends_on:
+      - db
+      - ld_redis
     networks:
       - botnet
+
   ld_redis:
     container_name: ld_redis
     image: redis
@@ -21,13 +25,30 @@ services:
       - ../data/redis:/data
     env_file:
       - ".env"
-    entrypoint: redis-server --appendonly yes --requirepass $REDIS_PASS
+    entrypoint: redis-server --requirepass $REDIS_PASS
     networks:
       - botnet
 
     restart: always
+
+  db:
+    image: postgres:11
+    environment:
+      TZ: Europe/Minsk
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - botnet
+
 networks:
   botnet:
     # указывается драйвер сети
     driver: bridge
+
+volumes:
+  pgdata:
 

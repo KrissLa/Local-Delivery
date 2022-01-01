@@ -1,9 +1,17 @@
-FROM python:3.8.5
+FROM python:3.8-slim
 
-RUN mkdir /src
+ENV PATH=/root/.poetry/bin:$PATH
 WORKDIR /src
-COPY requirements.txt /src
+COPY vendor/get-poetry.py .
 
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y git \
+ && rm -rf /var/lib/apt/lists/* \
+ && python get-poetry.py \
+ && rm get-poetry.py
+
+COPY pyproject.toml poetry.lock ./
+RUN poetry config virtualenvs.create false \
+ && poetry install --no-dev --no-root --no-interaction --no-ansi
+
 COPY . /src
